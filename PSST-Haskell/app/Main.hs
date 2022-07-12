@@ -1,6 +1,7 @@
 module Main where
+import Control.Monad
 
-import Lib
+import PSST.Repl
 
 main :: IO ()
-main = someFunc
+main = repl main

@@ -25,7 +25,8 @@ source-repository head
 
 library
   exposed-modules:
-      Lib
+      PSST.Core
+      PSST.Repl
   other-modules:
       Paths_PSST_Haskell
   hs-source-dirs:

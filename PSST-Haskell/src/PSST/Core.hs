@@ -1,4 +1,4 @@
-module Lib
+module PSST.Core
     ( someFunc
     ) where
 
