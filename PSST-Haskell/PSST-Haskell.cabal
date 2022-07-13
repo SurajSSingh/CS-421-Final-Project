@@ -26,6 +26,7 @@ source-repository head
 library
   exposed-modules:
       PSST.Core
+      PSST.Evaler
       PSST.Parser
       PSST.Repl
   other-modules:

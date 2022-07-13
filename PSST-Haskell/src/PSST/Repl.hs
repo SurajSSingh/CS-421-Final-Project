@@ -4,6 +4,8 @@ module PSST.Repl
     ) where
 
 import PSST.Core(Exp (..), Val (..), Diagnostic (..))
+import PSST.Parser
+import PSST.Evaler
 import System.IO
 import Control.Monad
 
@@ -12,19 +14,14 @@ readString = putStr "PSST-REPL >>> "
        >> hFlush stdout
        >> getLine
 
-parse :: String -> Exp
-parse str = ValExp (BoolVal False)
-
-eval :: Exp -> Either Diagnostic Val
-eval (ValExp val) = Right val
-eval _ = Left UnimplementedError
-
 repl :: IO () -> IO ()
 repl main = do
     input <- readString
 
-    unless (input == "exit" || input == "stop" || input == "end" || input == "quit")
-         $ case eval (parse input) of
+    if input == "exit" || input == "quit"
+        then return ()
+        else
+         case psstEval (psstParser input) of
             Right val -> print val
             Left err -> print err
-         >> main
+        >> main
