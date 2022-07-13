@@ -26,6 +26,7 @@ source-repository head
 library
   exposed-modules:
       PSST.Core
+      PSST.Parser
       PSST.Repl
   other-modules:
       Paths_PSST_Haskell
@@ -33,6 +34,9 @@ library
       src
   build-depends:
       base >=4.7 && <5
+    , mtl
+    , parsec
+    , unordered-containers
   default-language: Haskell2010
 
 executable PSST-Haskell-exe
@@ -45,6 +49,9 @@ executable PSST-Haskell-exe
   build-depends:
       PSST-Haskell
     , base >=4.7 && <5
+    , mtl
+    , parsec
+    , unordered-containers
   default-language: Haskell2010
 
 test-suite PSST-Haskell-test
@@ -58,4 +65,7 @@ test-suite PSST-Haskell-test
   build-depends:
       PSST-Haskell
     , base >=4.7 && <5
+    , mtl
+    , parsec
+    , unordered-containers
   default-language: Haskell2010

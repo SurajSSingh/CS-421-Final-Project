@@ -1,29 +1,30 @@
 -- Repl code adapted from https://blogg.bekk.no/creating-a-repl-in-haskell-efcdef1deec2
-module PSST.Repl 
-    (read_
-    ,eval_
-    ,print_
-    ,repl
+module PSST.Repl
+    (repl
     ) where
 
-import PSST.Core()
+import PSST.Core(Exp (..), Val (..), Diagnostic (..))
 import System.IO
 import Control.Monad
 
-read_ :: IO String
-read_ = putStr "PSST-REPL >>> "
-     >> hFlush stdout
-     >> getLine
+readString :: IO String
+readString = putStr "PSST-REPL >>> "
+       >> hFlush stdout
+       >> getLine
 
-eval_ :: String -> String
-eval_ input = input
+parse :: String -> Exp
+parse str = ValExp (BoolVal False)
 
-print_ :: String -> IO ()
-print_ = putStrLn
+eval :: Exp -> Either Diagnostic Val
+eval (ValExp val) = Right val
+eval _ = Left UnimplementedError
 
 repl :: IO () -> IO ()
 repl main = do
-    input <- read_
-    
+    input <- readString
+
     unless (input == "exit" || input == "stop" || input == "end" || input == "quit")
-         $ print_ (eval_ input) >> main
+         $ case eval (parse input) of
+            Right val -> print val
+            Left err -> print err
+         >> main
