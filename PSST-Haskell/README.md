@@ -1,1 +1,0 @@
-# PSST-Haskell

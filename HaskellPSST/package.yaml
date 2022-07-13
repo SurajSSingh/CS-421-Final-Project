@@ -1,6 +1,6 @@
-name:                PSST-Haskell
+name:                HaskellPSST
 version:             0.1.0.0
-github:              "githubuser/PSST-Haskell"
+github:              "githubuser/HaskellPSST"
 license:             BSD3
 author:              "Author name here"
 maintainer:          "example@example.com"
@@ -17,19 +17,18 @@ extra-source-files:
 # To avoid duplicated efforts in documentation and dealing with the
 # complications of embedding Haddock markup inside cabal files, it is
 # common to point users to the README.md file.
-description:         Please see the README on GitHub at <https://github.com/githubuser/PSST-Haskell#readme>
+description:         Please see the README on GitHub at <https://github.com/githubuser/HaskellPSST#readme>
 
 dependencies:
 - base >= 4.7 && < 5
-- unordered-containers
-- parsec
-- mtl
 
 library:
   source-dirs: src
+  exposed-modules:
+  - PSST.Transducer
 
 executables:
-  PSST-Haskell-exe:
+  HaskellPSST-exe:
     main:                Main.hs
     source-dirs:         app
     ghc-options:
@@ -37,10 +36,10 @@ executables:
     - -rtsopts
     - -with-rtsopts=-N
     dependencies:
-    - PSST-Haskell
+    - HaskellPSST
 
 tests:
-  PSST-Haskell-test:
+  HaskellPSST-test:
     main:                Spec.hs
     source-dirs:         test
     ghc-options:
@@ -48,4 +47,10 @@ tests:
     - -rtsopts
     - -with-rtsopts=-N
     dependencies:
-    - PSST-Haskell
+    - HaskellPSST
+    - QuickCheck >= 2.9.0
+    - HUnit >= 1.5
+    - tasty
+    - tasty-hunit
+    - tasty-quickcheck
+    - quickcheck-io
