@@ -2,31 +2,47 @@ module PSST.Core where
 import Data.HashMap.Strict as H
 
 --- ### Environment
-type Env = H.HashMap String Exp
+type Env = H.HashMap String [Exp]
 
-data Exp = BoolExp Bool
+--- ### Values
+data Val = BoolVal Bool
+         | IntVal Int
+         | RegexVal String
+         | Null
+         deriving (Eq)
+
+instance Show Val where
+    show (BoolVal b) = show b
+    show (IntVal i) = show i
+    show (RegexVal r) = show r
+    show Null = show "NULL"
+
+--- ### Expressions
+data Exp = ValExp Val
          | VarExp String
+         | AssignmentExp String Exp
+--- ### Operations:
+--- #### Concatenation
+--- #### Conjunction
+--- #### Element-of
+--- #### Concatenation
+--- #### Extract
+--- #### Replace
+--- #### ReplaceAll
+         | OperatorExp String Val Exp Exp
+         deriving (Eq)
+
 
 instance Show Exp where
-    show (BoolExp b) = show b
+    show (ValExp v) = show v
     show (VarExp v) = show v
---- ### Values
--- data Val = RegexVal String
---          | CharListVal String
---          | StringVal String
---          | IntVal Int
+    show (AssignmentExp var exp) = "Set " ++ show var ++ " to " ++ show exp
+    show (OperatorExp op v e1 e2) = "Operation " ++ show e1 ++ " and " ++ show e2
 
--- instance Show Val where
---     show (RegexVal regex) = "regex: `" ++ regex ++ "`"
---     show (CharListVal charList) = "alphabet: [" ++ charList ++ "]"
---     show (StringVal string) = string
---     show (IntVal int) = show int
+data Diagnostic = UnimplementedError String
+                | ParseError String
+                deriving (Eq)
 
--- --- ### Expressions
--- --- Expressions are defined from page 4
--- data Exp = Epsilon
---          | ValExp Val
---          | VarExp String
---          | AssignmentExp String Exp
---          | BinOpExp String Exp Exp
---          | FuncExp String [String] Exp Env
+instance Show Diagnostic where
+    show (UnimplementedError x) = x ++ " Unimplemented"
+    show (ParseError x) = "Parsing Error: " ++ x

@@ -9,8 +9,14 @@ import PSST.Evaluator
 
 runtime = H.fromList []
 
+replPrompt :: String
+replPrompt = "StrSol-REPL >>> "
+
+quitCommands :: [String]
+quitCommands = [ "quit", "exit"]
+
 readString :: IO String
-readString = putStr "PSST-REPL >>> "
+readString = putStr replPrompt
         >> hFlush stdout
         >> getLine
 
@@ -18,10 +24,15 @@ repl :: IO () -> IO ()
 repl main = do
     input <- readString
 
-    if input == "exit" || input == "quit"
-        then return ()
+    if input `elem` quitCommands
+        then do
+            print "Closing Solver" 
+            return ()
         else
-            case eval (parse input) runtime of
-            Right val -> print val
-            Left err -> print err
+            case strSolParse input of
+                Right exp ->
+                    case eval exp runtime of
+                    Right val -> print val
+                    Left err -> print err
+                Left err -> print err
         >> main

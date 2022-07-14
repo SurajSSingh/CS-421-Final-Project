@@ -2,5 +2,5 @@ module PSST.Evaluator (eval) where
 
 import PSST.Core
 
-eval :: Exp -> Env -> Either Exp Exp
-eval _ _ = Right $ BoolExp False
+eval :: Exp -> Env -> Either Diagnostic Exp
+eval _ _ = Left $ UnimplementedError "Evaluator"
