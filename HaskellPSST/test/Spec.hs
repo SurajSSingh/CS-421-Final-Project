@@ -7,7 +7,7 @@ main = defaultMain simpleMathTests
 
 
 simpleMathFunction :: Int -> Int -> Int -> Int
-simpleMathFunction a b c = a * b + c
+simpleMathFunction a b c = a * b - c
 
 simpleMathTests :: TestTree
 simpleMathTests = testGroup "Simple Math Tests"

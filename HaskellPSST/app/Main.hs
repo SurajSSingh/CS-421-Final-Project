@@ -1,6 +1,5 @@
 module Main where
-import PSST.Transducer
-
+import PSST.Runtime
 
 main :: IO ()
-main = print hello
+main = repl main
