@@ -81,10 +81,10 @@ definition keywords are modified from the paper, but mean the same thing
 
 ¶  = `x = y`
     | `z = x ~ y`
-    | `y = extract(i, e, x)`
-    | `y = replace(pat, rep, x)`
-    | `y = replaceAll(pat,rep,x)`
-    | `x is in e`
+    | `y = extract i e x`
+    | `y = replace pat rep x`
+    | `y = replaceAll pat rep x`
+    | `x in e`
     | `¶ and ¶`
     | `¶ or ¶`
     | `not ¶`

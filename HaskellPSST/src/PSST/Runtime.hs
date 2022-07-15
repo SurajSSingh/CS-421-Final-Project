@@ -33,6 +33,6 @@ repl main = do
                 Right exp ->
                     case eval exp runtime of
                     Right val -> print val
-                    Left err -> print err
-                Left err -> print err
+                    Left eErr -> print eErr
+                Left pErr -> print pErr
         >> main
