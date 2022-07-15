@@ -12,7 +12,43 @@ tests :: TestTree
 tests = testGroup "Tests" [simpleMathTests, parserTests, evaluatorTests]
 
 parserTests :: TestTree
-parserTests = testGroup "Parser Tests" [parseExpTest, parseErrorTest]
+parserTests = testGroup "Parser Tests" [parseStringToTree, parseExpTest, parseErrorTest]
+
+parseStringToTree :: TestTree
+parseStringToTree = testGroup "Parse Regex String to Regex Tree"
+  [ testGroup "Parsing Single Literal" 
+    [ testCase "Parse a" (strSolParseR "\"a\"" @?= Right (Literal "a"))
+    , testCase "Parse 1" (strSolParseR "\"1\"" @?= Right (Literal "1"))
+    ]
+  , testGroup "Parsing Sequence of Literal" 
+    [ testCase "Parse ab" (strSolParseR "\"ab\"" @?= Right (Sequence [Literal "a",Literal "b"]))
+    , testCase "Parse abc" (strSolParseR "\"abc\"" @?= Right (Sequence [Literal "a",Literal "b", Literal "c"]))
+    , testCase "Parse 123" (strSolParseR "\"123\"" @?= Right (Sequence [Literal "1",Literal "2", Literal "3"]))
+    ]
+  , testGroup "Parsing Capture Group only" 
+    [ testCase "Parse (a)" (strSolParseR "\"(a)\"" @?= Right (CaptureGroup 1 (Literal "a")))
+    , testCase "Parse ((a))" (strSolParseR "\"((a))\"" @?= Right (CaptureGroup 1 (CaptureGroup 2 (Literal "a"))))
+    , testCase "Parse (a)(b)" (strSolParseR "\"((a))\"" @?= Right (CaptureGroup 1 (CaptureGroup 2 (Literal "a"))))
+    , testCase "Parse ((a)(b))" (strSolParseR "\"((a))\"" @?= Right (CaptureGroup 1 (CaptureGroup 2 (Literal "a"))))
+    , testCase "Parse (a)((b)(c))(d)" (strSolParseR "\"((a))\"" @?= Right (CaptureGroup 1 (CaptureGroup 2 (Literal "a"))))
+    ]
+  , testGroup "Parsing Choice only" 
+    [ testCase "Parse Literal choice a|b" (strSolParseR "\"a|b\"" @?= Right (BinChoice (Literal "a") (Literal "b")))
+    , testCase "Parse Sequence choice abc|def" (strSolParseR "\"abc|def\"" @?= Right (BinChoice (Sequence [Literal "a",Literal "b", Literal "c"]) (Sequence [Literal "d",Literal "e", Literal "f"])))
+    ]
+  , testGroup "Parsing Repetition Operators"
+    [
+
+    ]
+  , testGroup "Parsing Capture Group and Choice"
+    []
+  , testGroup "Parsing Capture Group and Repetition Operators"
+    []
+  , testGroup "Parsing Choice and Repetition Operators"
+    []
+  , testGroup "Any Valid Regex"
+    []
+  ]
 
 parseExpTest :: TestTree
 parseExpTest = testGroup "Parse Expression Tests"
@@ -26,10 +62,10 @@ parseExpTest = testGroup "Parse Expression Tests"
       , testCase "Parse Spaces Around"  (strSolParse "   314   " @?= Right (ValExp (IntVal 314)))
       ]
       , testGroup "Parse String/Regex"
-      [ testCase "Parse Epsilon"  (strSolParse "``" @?= Right (ValExp (RegexVal "")))
-      , testCase "Parse Single Literal"  (strSolParse "`a`" @?= Right (ValExp (RegexVal "a")))
-      , testCase "Parse Sequence of Literal"  (strSolParse "`abc`" @?= Right (ValExp (RegexVal "abc")))
-      , testCase "Parse Simple Regex"  (strSolParse "`[abc]`" @?= Right (ValExp (RegexVal "[abc]")))
+      [ testCase "Parse Epsilon"  (strSolParse "``" @?= Right (ValExp (RegexVal False "")))
+      , testCase "Parse Single Literal"  (strSolParse "`a`" @?= Right (ValExp (RegexVal False "a")))
+      , testCase "Parse Sequence of Literal"  (strSolParse "`abc`" @?= Right (ValExp (RegexVal False "abc")))
+      , testCase "Parse Simple Regex"  (strSolParse "`[abc]`" @?= Right (ValExp (RegexVal False "[abc]")))
       -- , testCase "Parse Complex Regex"  (strSolParse "`(a|b)*([^cd]?[efg])+`" @?= Right (ValExp (RegexVal "\\d+")))
       -- , testCase "Parse Lazy Complex Regex"  (strSolParse "`(a|b)*?[^cd]??[efg]*?`" @?= Right (ValExp (RegexVal "\\d+")))
       -- [ testCase "Parse Epsilon"  (strSolParse "``" @?= Right (ValExp (RegexVal Epsilon)))

@@ -1,4 +1,4 @@
-module PSST.Parser (strSolParse, strSolParse2) where
+module PSST.Parser (strSolParse, strSolParseR) where
 import PSST.Core
 
 import Data.Functor.Identity
@@ -190,5 +190,5 @@ exprP = between maybeSpaceP maybeSpaceP rawExprP <* eof
 strSolParse :: String -> Either ParseError Exp
 strSolParse = parse exprP "Error"
 
-strSolParse2 :: String -> Either ParseError RegexTree
-strSolParse2 = parse regex "Error"
+strSolParseR :: String -> Either ParseError RegexTree
+strSolParseR = parse regex "Error"
