@@ -42,22 +42,27 @@ data RegexTree = EmptySet
 --         show node ++ [repeatSym] ++ [lazySym]
 
 regexTreeSeqHelper :: [RegexTree] -> RegexTree
-regexTreeSeqHelper [] = EmptySet
+regexTreeSeqHelper [] = EmptySet -- illegal pattern
 regexTreeSeqHelper [tree] = tree
 regexTreeSeqHelper trees = Sequence trees
 
 regexTreeRepHelper ::  Bool -> Int -> Maybe Int -> [RegexTree] -> RegexTree
-regexTreeRepHelper lazy start end [] = Repetition lazy start end EmptySet
+regexTreeRepHelper lazy start end [] = EmptySet -- illegal pattern
 regexTreeRepHelper lazy start end [tree] = Repetition lazy start end tree
 regexTreeRepHelper lazy start end (t:ts) = regexTreeRepHelper lazy start end ts
--- regexTreeRepHelper _ _ _ _ = Repetition False 0 (Just 0) EmptySet
 
 regexTreeBuilder :: [String] -> RegexTree
 regexTreeBuilder strings = fst $ regexTreeBuilderAux strings [] 1
     where
-        regexTreeBuilderAux :: [String] -> [RegexTree] -> Int -> (RegexTree, (Int, [String]))
+        regexTreeBuilderAux :: [String] ->  [RegexTree] -> Int -> (RegexTree, (Int, [String]))
         regexTreeBuilderAux (c:cs) before num = case c of
           "|" -> (BinChoice (regexTreeSeqHelper before) $ fst $ regexTreeBuilderAux cs [] num, (num, []))
+          "(" -> regexTreeBuilderAux nextCs (before ++ [group]) finalNum
+            where
+                res = regexTreeBuilderAux cs [] (num+1)
+                group = CaptureGroup num $ fst res
+                (finalNum, nextCs) = snd res
+          ")" -> (regexTreeSeqHelper before, (num, cs))
         --   "{" -> _
         --   "}" -> EmptySet
           "?" -> (rTree, (num, next))
@@ -75,23 +80,8 @@ regexTreeBuilder strings = fst $ regexTreeBuilderAux strings [] 1
                 (rTree, next) = case cs of
                     "?":n -> (regexTreeRepHelper True 0 Nothing before, n)
                     _ -> (regexTreeRepHelper False 0 Nothing before , cs)
-          "(" -> regexTreeBuilderAux nextCs (before ++ [group]) finalNum
-            where
-                res = regexTreeBuilderAux cs [] (num+1)
-                group = CaptureGroup num $ fst res
-                (finalNum, nextCs) = snd res
-          ")" -> (regexTreeSeqHelper before, (num, cs))
-            -- [] -> (EmptySet, (num, cs))
-            -- [b] -> (b, (num, cs))
-            -- _ -> (Sequence before, (num+1, cs))
           c   -> regexTreeBuilderAux cs (before ++ [Literal c]) num
-
-        -- regexTreeBuilderAux [] [] [a] num = (a, (num, []))
-        -- regexTreeBuilderAux [] [b] num = (b, (num, []))
-        -- regexTreeBuilderAux [] [] after num = (Sequence after, (num, []))
         regexTreeBuilderAux [] before num = (regexTreeSeqHelper before, (num, []))
-        -- regexTreeBuilderAux [] before after num = (Sequence $ before ++ after, (num, []))
-        -- regexTreeBuilderAux _ _ _ _ = (EmptySet, (-1, []))
 
 --- ### Values
 data Val = BoolVal Bool
