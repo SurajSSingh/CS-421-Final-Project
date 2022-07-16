@@ -46,10 +46,10 @@ regexTreeSeqHelper [] = EmptySet -- illegal pattern
 regexTreeSeqHelper [tree] = tree
 regexTreeSeqHelper trees = Sequence trees
 
-regexTreeRepHelper ::  Bool -> Int -> Maybe Int -> [RegexTree] -> RegexTree
-regexTreeRepHelper lazy start end [] = EmptySet -- illegal pattern
-regexTreeRepHelper lazy start end [tree] = Repetition lazy start end tree
-regexTreeRepHelper lazy start end (t:ts) = regexTreeRepHelper lazy start end ts
+regexTreeRepHelper ::  Bool -> Int -> Maybe Int -> [RegexTree] -> [RegexTree]
+regexTreeRepHelper lazy start end [] = [EmptySet] -- illegal pattern
+regexTreeRepHelper lazy start end [tree] = [Repetition lazy start end tree]
+regexTreeRepHelper lazy start end (t:ts) = t : regexTreeRepHelper lazy start end ts
 
 regexTreeBuilder :: [String] -> RegexTree
 regexTreeBuilder strings = fst $ regexTreeBuilderAux strings [] 1
@@ -65,17 +65,17 @@ regexTreeBuilder strings = fst $ regexTreeBuilderAux strings [] 1
           ")" -> (regexTreeSeqHelper before, (num, cs))
         --   "{" -> _
         --   "}" -> EmptySet
-          "?" -> (rTree, (num, next))
+          "?" -> regexTreeBuilderAux next rTree num
             where
                 (rTree, next) = case cs of
-                    "?":n -> (regexTreeRepHelper True 0 (Just 0) before, n)
-                    _ -> (regexTreeRepHelper False 0 (Just 0) before , cs)
-          "+" -> (rTree, (num, next))
+                    "?":n -> (regexTreeRepHelper True 0 (Just 1) before, n)
+                    _ -> (regexTreeRepHelper False 0 (Just 1) before , cs)
+          "+" -> regexTreeBuilderAux next rTree num
             where
                 (rTree, next) = case cs of
                     "?":n -> (regexTreeRepHelper True 1 Nothing before, n)
                     _ -> (regexTreeRepHelper False 1 Nothing before , cs)
-          "*" -> (rTree, (num, next))
+          "*" -> regexTreeBuilderAux next rTree num
             where
                 (rTree, next) = case cs of
                     "?":n -> (regexTreeRepHelper True 0 Nothing before, n)

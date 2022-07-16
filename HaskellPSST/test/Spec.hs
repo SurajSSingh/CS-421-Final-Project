@@ -14,32 +14,34 @@ tests = testGroup "Tests" [simpleMathTests, parserTests, evaluatorTests]
 parserTests :: TestTree
 parserTests = testGroup "Parser Tests" [parseStringToTree, parseExpTest, parseErrorTest]
 
+regexTestHelper :: String -> RegexTree -> TestTree
+regexTestHelper regexStr regexTree = testCase ("Parsing " ++ regexStr) (strSolParseR ("\"" ++ regexStr ++ "\"") @?= Right regexTree)
+
 parseStringToTree :: TestTree
 parseStringToTree = testGroup "Parse Regex String to Regex Tree"
-  [ testGroup "Parsing Single Literal" 
-    [ testCase "Parse a" (strSolParseR "\"a\"" @?= Right (Literal "a"))
-    , testCase "Parse 1" (strSolParseR "\"1\"" @?= Right (Literal "1"))
+  [ testGroup "Parsing Single Literal"
+    [ regexTestHelper "a" (Literal "a")
+    , regexTestHelper "1" (Literal "1")
     ]
-  , testGroup "Parsing Sequence of Literal" 
-    [ testCase "Parse ab" (strSolParseR "\"ab\"" @?= Right (Sequence [Literal "a",Literal "b"]))
-    , testCase "Parse abc" (strSolParseR "\"abc\"" @?= Right (Sequence [Literal "a",Literal "b", Literal "c"]))
-    , testCase "Parse 123" (strSolParseR "\"123\"" @?= Right (Sequence [Literal "1",Literal "2", Literal "3"]))
+  , testGroup "Parsing Sequence of Literal"
+    [ regexTestHelper "ab" (Sequence [Literal "a",Literal "b"])
+    , regexTestHelper "abc" (Sequence [Literal "a",Literal "b", Literal "c"])
+    , regexTestHelper "123" (Sequence [Literal "1",Literal "2", Literal "3"])
     ]
-  , testGroup "Parsing Capture Group only" 
-    [ testCase "Parse (a)" (strSolParseR "\"(a)\"" @?= Right (CaptureGroup 1 (Literal "a")))
-    , testCase "Parse ((a))" (strSolParseR "\"((a))\"" @?= Right (CaptureGroup 1 (CaptureGroup 2 (Literal "a"))))
-    , testCase "Parse (a)(b)" (strSolParseR "\"((a))\"" @?= Right (CaptureGroup 1 (CaptureGroup 2 (Literal "a"))))
-    , testCase "Parse ((a)(b))" (strSolParseR "\"((a))\"" @?= Right (CaptureGroup 1 (CaptureGroup 2 (Literal "a"))))
-    , testCase "Parse (a)((b)(c))(d)" (strSolParseR "\"((a))\"" @?= Right (CaptureGroup 1 (CaptureGroup 2 (Literal "a"))))
+  , testGroup "Parsing Capture Group only"
+    [ regexTestHelper "(a)" (CaptureGroup 1 (Literal "a"))
+    , regexTestHelper "((a))" (CaptureGroup 1 (CaptureGroup 2 (Literal "a")))
+    , regexTestHelper "(a)(b)" (Sequence [CaptureGroup 1 (Literal "a"), CaptureGroup 2 (Literal "b")])
+    , regexTestHelper "((a)(b))" (CaptureGroup 1 (Sequence [CaptureGroup 2 (Literal "a"), CaptureGroup 3 (Literal "b")]))
+    -- , regexTestHelper "(a)((b)(c))(d)" (CaptureGroup 1 (CaptureGroup 2 (Literal "a")))
     ]
-  , testGroup "Parsing Choice only" 
-    [ testCase "Parse Literal choice a|b" (strSolParseR "\"a|b\"" @?= Right (BinChoice (Literal "a") (Literal "b")))
-    , testCase "Parse Sequence choice abc|def" (strSolParseR "\"abc|def\"" @?= Right (BinChoice (Sequence [Literal "a",Literal "b", Literal "c"]) (Sequence [Literal "d",Literal "e", Literal "f"])))
+  , testGroup "Parsing Choice only"
+    [ regexTestHelper "a|b" (BinChoice (Literal "a") (Literal "b"))
+    , regexTestHelper "abc|def" (BinChoice (Sequence [Literal "a",Literal "b", Literal "c"]) (Sequence [Literal "d",Literal "e", Literal "f"]))
+    , regexTestHelper "a|b|c" (BinChoice (Literal "a") (BinChoice (Literal "b") (Literal "c")))
+    , regexTestHelper "a|bc|d" (BinChoice (Literal "a") (BinChoice (Sequence [Literal "b", Literal "c"]) (Literal "d")))
     ]
-  , testGroup "Parsing Repetition Operators"
-    [
-
-    ]
+  , parseStringToTreeRepetition
   , testGroup "Parsing Capture Group and Choice"
     []
   , testGroup "Parsing Capture Group and Repetition Operators"
@@ -49,6 +51,29 @@ parseStringToTree = testGroup "Parse Regex String to Regex Tree"
   , testGroup "Any Valid Regex"
     []
   ]
+
+parseStringToTreeRepetition :: TestTree
+parseStringToTreeRepetition = testGroup "Parsing Repetition Operators"
+  [ regexTestHelper "a*" (Repetition False 0 Nothing (Literal "a"))
+  , regexTestHelper "a+" (Repetition False 1 Nothing (Literal "a"))
+  , regexTestHelper "a?" (Repetition False 0 (Just 1) (Literal "a"))
+  , regexTestHelper "a*?" (Repetition True 0 Nothing (Literal "a"))
+  , regexTestHelper "a+?" (Repetition True 1 Nothing (Literal "a"))
+  , regexTestHelper "a??" (Repetition True 0 (Just 1) (Literal "a"))
+  , regexTestHelper "ab*" (Sequence [Literal "a", Repetition False 0 Nothing (Literal "b")])
+  , regexTestHelper "ab+" (Sequence [Literal "a", Repetition False 1 Nothing (Literal "b")])
+  , regexTestHelper "ab?" (Sequence [Literal "a", Repetition False 0 (Just 1) (Literal "b")])
+  , regexTestHelper "ab*?" (Sequence [Literal "a", Repetition True 0 Nothing (Literal "b")])
+  , regexTestHelper "ab+?" (Sequence [Literal "a", Repetition True 1 Nothing (Literal "b")])
+  , regexTestHelper "ab??" (Sequence [Literal "a", Repetition True 0 (Just 1) (Literal "b")])
+  , regexTestHelper "a*b" (Sequence [Repetition False 0 Nothing (Literal "a"), Literal "b"])
+  , regexTestHelper "a+b" (Sequence [Repetition False 1 Nothing (Literal "a"), Literal "b"])
+  , regexTestHelper "a?b" (Sequence [Repetition False 0 (Just 1) (Literal "a"), Literal "b"])
+  , regexTestHelper "a*?b" (Sequence [Repetition True 0 Nothing (Literal "a"), Literal "b"])
+  , regexTestHelper "a+?b" (Sequence [Repetition True 1 Nothing (Literal "a"), Literal "b"])
+  , regexTestHelper "a??b" (Sequence [Repetition True 0 (Just 1) (Literal "a"), Literal "b"])
+  ]
+
 
 parseExpTest :: TestTree
 parseExpTest = testGroup "Parse Expression Tests"
