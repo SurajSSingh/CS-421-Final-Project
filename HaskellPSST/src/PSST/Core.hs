@@ -7,7 +7,7 @@ import qualified Data.Maybe
 
 ---
 requireEscapeRegexSymbol :: [String]
-requireEscapeRegexSymbol = ["\\(", "\\)", "\\|", "\\?", "\\*", "\\+", "\\$"]
+requireEscapeRegexSymbol = ["\\(", "\\)", "\\|", "\\?", "\\*", "\\+", "\\$", "\\."]
 
 --- ### Environment
 type Env = H.HashMap String [Exp]
@@ -18,6 +18,7 @@ type EvalState a = StateT Env (Except Diagnostic) a
 --- Adapted from Definition 3.1 of 
 data RegexTree = EmptySet
                | Epsilon
+               | AnyCharLiteral
                | Literal String
                | CaptureGroup Int RegexTree
                | Sequence [RegexTree]
@@ -68,8 +69,6 @@ regexTreeBuilder strings = fst $ regexTreeBuilderAux strings [] 1
                 group = CaptureGroup num $ fst res
                 (finalNum, nextCs) = snd res
           ")" -> (regexTreeSeqHelper before, (num, cs))
-        --   "{" -> _
-        --   "}" -> EmptySet
           "?" -> regexTreeBuilderAux next rTree num
             where
                 (rTree, next) = case cs of
@@ -88,6 +87,7 @@ regexTreeBuilder strings = fst $ regexTreeBuilderAux strings [] 1
           er | er `elem` requireEscapeRegexSymbol   -> regexTreeBuilderAux cs (before ++ [Literal lr]) num
             where
               lr = Data.Maybe.fromMaybe er (stripPrefix "\\" er)
+          "." -> regexTreeBuilderAux cs (before ++ [AnyCharLiteral]) num
           c   -> regexTreeBuilderAux cs (before ++ [Literal c]) num
         regexTreeBuilderAux [] before num = (regexTreeSeqHelper before, (num, []))
 

@@ -9,17 +9,17 @@
     * Choice: "|":
     	* Takes SEQUENCE before and after (not just literals, e.g. "ax|by" means Choice (ax) (by) )
     * Capture Group: Between parentheses "()"
-    * Repetition: anyOf "?" "*" "+" "{m, }" "{m,n}", applied to LITERAL before 
+    * Repetition: anyOf "?" "*" "+", applied to LITERAL before 
         * Greedy Repetition: default, take as many as possible
             * "?": Zero or one
             * "*": At least zero
             * "+": At least one
-            * "{m, }": At least m
-            * "{m,n}": Between m and n (m <= n)
+            * "{m, }": At least m ### NOT INCLUDED
+            * "{m,n}": Between m and n (m <= n) ### NOT INCLUDED
         * Lazy Repetition: followed by "?", same meaning as greedy but take as few as possible
 * Operator Precedence:
     * Capture Group
-    * Choice (keep going until you reach the end or hit the end of a capture group)
+    * Choice (keep going until you reach the end or hit the begin/end of a capture group)
     * Repetition (look just before for application)
 
 ## Example Repl

@@ -58,7 +58,7 @@ escape = do
     c <- oneOf $ 
         ['\\','"','0','n','r','v','t','b','f'] -- all regular characters which can be escaped
         ++ 
-        ['(', ')', '|', '?', '*', '+', '$'] -- all regex characters which can be escaped
+        ['(', ')', '|', '?', '*', '+', '$', '.'] -- all regex characters which can be escaped
     return [d, c]
 
 nonEscape :: Parser Char

@@ -22,12 +22,15 @@ parseStringToTree = testGroup "Parse Regex String to Regex Tree"
   [ testGroup "Parsing Single Literal"
     [ regexTestHelper "a" (Literal "a")
     , regexTestHelper "1" (Literal "1")
+    , regexTestHelper "." (AnyCharLiteral)
     ]
   , testGroup "Parsing Escaped Literal"
     [ regexTestHelper "\\\\" (Literal "\\\\")
-    , regexTestHelper "\\n" (Literal "\n")
+    , regexTestHelper "\\n" (Literal "\\n")
+    , regexTestHelper "\\t" (Literal "\\t")
     , regexTestHelper "\\*" (Literal "*")
     , regexTestHelper "\\$" (Literal "$")
+    , regexTestHelper "\\." (Literal ".")
     ]
   , testGroup "Parsing Sequence of Literal"
     [ regexTestHelper "ab" (Sequence [Literal "a",Literal "b"])
