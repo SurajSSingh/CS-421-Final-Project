@@ -54,24 +54,36 @@ parseStringToTree = testGroup "Parse Regex String to Regex Tree"
 
 parseStringToTreeRepetition :: TestTree
 parseStringToTreeRepetition = testGroup "Parsing Repetition Operators"
-  [ regexTestHelper "a*" (Repetition False 0 Nothing (Literal "a"))
-  , regexTestHelper "a+" (Repetition False 1 Nothing (Literal "a"))
-  , regexTestHelper "a?" (Repetition False 0 (Just 1) (Literal "a"))
-  , regexTestHelper "a*?" (Repetition True 0 Nothing (Literal "a"))
-  , regexTestHelper "a+?" (Repetition True 1 Nothing (Literal "a"))
-  , regexTestHelper "a??" (Repetition True 0 (Just 1) (Literal "a"))
-  , regexTestHelper "ab*" (Sequence [Literal "a", Repetition False 0 Nothing (Literal "b")])
-  , regexTestHelper "ab+" (Sequence [Literal "a", Repetition False 1 Nothing (Literal "b")])
-  , regexTestHelper "ab?" (Sequence [Literal "a", Repetition False 0 (Just 1) (Literal "b")])
-  , regexTestHelper "ab*?" (Sequence [Literal "a", Repetition True 0 Nothing (Literal "b")])
-  , regexTestHelper "ab+?" (Sequence [Literal "a", Repetition True 1 Nothing (Literal "b")])
-  , regexTestHelper "ab??" (Sequence [Literal "a", Repetition True 0 (Just 1) (Literal "b")])
-  , regexTestHelper "a*b" (Sequence [Repetition False 0 Nothing (Literal "a"), Literal "b"])
-  , regexTestHelper "a+b" (Sequence [Repetition False 1 Nothing (Literal "a"), Literal "b"])
-  , regexTestHelper "a?b" (Sequence [Repetition False 0 (Just 1) (Literal "a"), Literal "b"])
-  , regexTestHelper "a*?b" (Sequence [Repetition True 0 Nothing (Literal "a"), Literal "b"])
-  , regexTestHelper "a+?b" (Sequence [Repetition True 1 Nothing (Literal "a"), Literal "b"])
-  , regexTestHelper "a??b" (Sequence [Repetition True 0 (Just 1) (Literal "a"), Literal "b"])
+  [ testGroup "Parsing Kleene Star" 
+    [ regexTestHelper "a*" (Repetition False 0 Nothing (Literal "a"))
+    , regexTestHelper "a*?" (Repetition True 0 Nothing (Literal "a"))
+    , regexTestHelper "ab*" (Sequence [Literal "a", Repetition False 0 Nothing (Literal "b")])
+    , regexTestHelper "ab*?" (Sequence [Literal "a", Repetition True 0 Nothing (Literal "b")])
+    , regexTestHelper "a*b" (Sequence [Repetition False 0 Nothing (Literal "a"), Literal "b"])
+    , regexTestHelper "a*?b" (Sequence [Repetition True 0 Nothing (Literal "a"), Literal "b"])
+    , regexTestHelper "ab*c" (Sequence [Literal "a", Repetition False 0 Nothing (Literal "b"), Literal "c"])
+    , regexTestHelper "ab*?c" (Sequence [Literal "a", Repetition True 0 Nothing (Literal "b"), Literal "c"])
+    ]
+  , testGroup "Parsing Plus"
+    [ regexTestHelper "a+" (Repetition False 1 Nothing (Literal "a"))
+    , regexTestHelper "a+?" (Repetition True 1 Nothing (Literal "a"))
+    , regexTestHelper "ab+" (Sequence [Literal "a", Repetition False 1 Nothing (Literal "b")])
+    , regexTestHelper "ab+?" (Sequence [Literal "a", Repetition True 1 Nothing (Literal "b")])
+    , regexTestHelper "a+b" (Sequence [Repetition False 1 Nothing (Literal "a"), Literal "b"])
+    , regexTestHelper "a+?b" (Sequence [Repetition True 1 Nothing (Literal "a"), Literal "b"])
+    , regexTestHelper "ab+c" (Sequence [Literal "a", Repetition False 1 Nothing (Literal "b"), Literal "c"])
+    , regexTestHelper "ab+?c" (Sequence [Literal "a", Repetition True 1 Nothing (Literal "b"), Literal "c"])
+    ] 
+  , testGroup "Parsing Optional"
+    [regexTestHelper "a?" (Repetition False 0 (Just 1) (Literal "a"))
+    , regexTestHelper "a??" (Repetition True 0 (Just 1) (Literal "a"))
+    , regexTestHelper "ab?" (Sequence [Literal "a", Repetition False 0 (Just 1) (Literal "b")])
+    , regexTestHelper "ab??" (Sequence [Literal "a", Repetition True 0 (Just 1) (Literal "b")])
+    , regexTestHelper "a?b" (Sequence [Repetition False 0 (Just 1) (Literal "a"), Literal "b"])
+    , regexTestHelper "a??b" (Sequence [Repetition True 0 (Just 1) (Literal "a"), Literal "b"])
+    , regexTestHelper "ab?c" (Sequence [Literal "a", Repetition False 0 (Just 1) (Literal "b"), Literal "c"])
+    , regexTestHelper "ab??c" (Sequence [Literal "a", Repetition True 0 (Just 1) (Literal "b"), Literal "c"])
+    ]
   ]
 
 
