@@ -2,7 +2,12 @@ module PSST.Core where
 import Data.HashMap.Strict as H
 import Control.Monad.State
 import Control.Monad.Except
+import Data.List
+import qualified Data.Maybe
 
+---
+requireEscapeRegexSymbol :: [String]
+requireEscapeRegexSymbol = ["\\(", "\\)", "\\|", "\\?", "\\*", "\\+", "\\$"]
 
 --- ### Environment
 type Env = H.HashMap String [Exp]
@@ -80,6 +85,9 @@ regexTreeBuilder strings = fst $ regexTreeBuilderAux strings [] 1
                 (rTree, next) = case cs of
                     "?":n -> (regexTreeRepHelper True 0 Nothing before, n)
                     _ -> (regexTreeRepHelper False 0 Nothing before , cs)
+          er | er `elem` requireEscapeRegexSymbol   -> regexTreeBuilderAux cs (before ++ [Literal lr]) num
+            where
+              lr = Data.Maybe.fromMaybe er (stripPrefix "\\" er)
           c   -> regexTreeBuilderAux cs (before ++ [Literal c]) num
         regexTreeBuilderAux [] before num = (regexTreeSeqHelper before, (num, []))
 

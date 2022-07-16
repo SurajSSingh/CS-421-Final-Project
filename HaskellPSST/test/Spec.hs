@@ -23,6 +23,12 @@ parseStringToTree = testGroup "Parse Regex String to Regex Tree"
     [ regexTestHelper "a" (Literal "a")
     , regexTestHelper "1" (Literal "1")
     ]
+  , testGroup "Parsing Escaped Literal"
+    [ regexTestHelper "\\\\" (Literal "\\\\")
+    , regexTestHelper "\\n" (Literal "\n")
+    , regexTestHelper "\\*" (Literal "*")
+    , regexTestHelper "\\$" (Literal "$")
+    ]
   , testGroup "Parsing Sequence of Literal"
     [ regexTestHelper "ab" (Sequence [Literal "a",Literal "b"])
     , regexTestHelper "abc" (Sequence [Literal "a",Literal "b", Literal "c"])
@@ -40,12 +46,23 @@ parseStringToTree = testGroup "Parse Regex String to Regex Tree"
     , regexTestHelper "abc|def" (BinChoice (Sequence [Literal "a",Literal "b", Literal "c"]) (Sequence [Literal "d",Literal "e", Literal "f"]))
     , regexTestHelper "a|b|c" (BinChoice (Literal "a") (BinChoice (Literal "b") (Literal "c")))
     , regexTestHelper "a|bc|d" (BinChoice (Literal "a") (BinChoice (Sequence [Literal "b", Literal "c"]) (Literal "d")))
+    , regexTestHelper "a|b|c|d" (BinChoice (Literal "a") (BinChoice (Literal "b") (BinChoice (Literal "c") (Literal "d"))))
     ]
   , parseStringToTreeRepetition
   , testGroup "Parsing Capture Group and Choice"
-    []
+    [ regexTestHelper "(a|b)" (CaptureGroup 1 (BinChoice (Literal "a") (Literal "b")))
+    , regexTestHelper "(a)|b" (BinChoice (CaptureGroup 1 (Literal "a")) (Literal "b"))
+    , regexTestHelper "a|(b)" (BinChoice (Literal "a") (CaptureGroup 1 (Literal "b")))
+    , regexTestHelper "(a)|(b)" (BinChoice (CaptureGroup 1 (Literal "a")) (CaptureGroup 2 (Literal "b")))
+    ]
   , testGroup "Parsing Capture Group and Repetition Operators"
-    []
+    [ regexTestHelper "(abc)?" (Repetition False 0 (Just 1) (CaptureGroup 1 (Sequence [Literal "a", Literal "b", Literal "c"])))
+    , regexTestHelper "(abc)??" (Repetition True 0 (Just 1) (CaptureGroup 1 (Sequence [Literal "a", Literal "b", Literal "c"])))
+    , regexTestHelper "a(bc)?" (Sequence [Literal "a", Repetition False 0 (Just 1) (CaptureGroup 1 (Sequence [Literal "b", Literal "c"]))])
+    , regexTestHelper "a(bc)??" (Sequence [Literal "a", Repetition True 0 (Just 1) (CaptureGroup 1 (Sequence [Literal "b", Literal "c"]))])
+    , regexTestHelper "a(bc)?d" (Sequence [Literal "a", Repetition False 0 (Just 1) (CaptureGroup 1 (Sequence [Literal "b", Literal "c"])), Literal "d"])
+    , regexTestHelper "a(bc)??d" (Sequence [Literal "a", Repetition True 0 (Just 1) (CaptureGroup 1 (Sequence [Literal "b", Literal "c"])), Literal "d"])
+    ]
   , testGroup "Parsing Choice and Repetition Operators"
     []
   , testGroup "Any Valid Regex"
@@ -54,7 +71,7 @@ parseStringToTree = testGroup "Parse Regex String to Regex Tree"
 
 parseStringToTreeRepetition :: TestTree
 parseStringToTreeRepetition = testGroup "Parsing Repetition Operators"
-  [ testGroup "Parsing Kleene Star" 
+  [ testGroup "Parsing Kleene Star"
     [ regexTestHelper "a*" (Repetition False 0 Nothing (Literal "a"))
     , regexTestHelper "a*?" (Repetition True 0 Nothing (Literal "a"))
     , regexTestHelper "ab*" (Sequence [Literal "a", Repetition False 0 Nothing (Literal "b")])
@@ -73,7 +90,7 @@ parseStringToTreeRepetition = testGroup "Parsing Repetition Operators"
     , regexTestHelper "a+?b" (Sequence [Repetition True 1 Nothing (Literal "a"), Literal "b"])
     , regexTestHelper "ab+c" (Sequence [Literal "a", Repetition False 1 Nothing (Literal "b"), Literal "c"])
     , regexTestHelper "ab+?c" (Sequence [Literal "a", Repetition True 1 Nothing (Literal "b"), Literal "c"])
-    ] 
+    ]
   , testGroup "Parsing Optional"
     [regexTestHelper "a?" (Repetition False 0 (Just 1) (Literal "a"))
     , regexTestHelper "a??" (Repetition True 0 (Just 1) (Literal "a"))
