@@ -6,8 +6,8 @@ import Data.HashMap.Strict as H
 import PSST.Core
 import PSST.Parser
 import PSST.Evaluator
-
-runtime = H.fromList []
+import Control.Monad.Except
+import Control.Monad.State
 
 replPrompt :: String
 replPrompt = "StrSol-REPL >>> "
@@ -20,10 +20,9 @@ readString = putStr replPrompt
         >> hFlush stdout
         >> getLine
 
-repl :: IO () -> IO ()
-repl main = do
+repl :: IO () -> Env -> IO ()
+repl main env = do
     input <- readString
-
     if input `elem` quitCommands
         then do
             print "Closing Solver" 
@@ -31,8 +30,8 @@ repl main = do
         else
             case strSolParse input of
                 Right exp ->
-                    case eval exp runtime of
-                    Right val -> print val
+                    case runExcept $ runStateT (eval exp) env of
+                    Right (val, env) -> print val
                     Left eErr -> print eErr
                 Left pErr -> print pErr
-        >> main
+        >> repl main env
