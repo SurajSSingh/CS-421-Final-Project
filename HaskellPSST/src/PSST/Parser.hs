@@ -14,16 +14,22 @@ keywords :: [String]
 keywords = ["extract", "replace", "replaceAll", "in", ":e", ":r", ":R", "clear", "check"]
 
 --- ### Lexers
+--- #### Notes to self:
+---     * spaces = 0 or more spaces
+
+--- #### Get a symbol
 symbol :: String -> Parser String
 symbol s = do string s
               spaces
               return s
 
+--- #### Get an integer
 int :: Parser Int
 int = do digits <- many1 digit <?> "an integer"
          spaces
          return (read digits :: Int)
 
+--- #### Get a variable identifier
 var :: Parser String
 var = try $ do
     v1 <- letter <?> "an identifier"
@@ -74,40 +80,28 @@ regex = try $ do
     char '"' <?> "CLOSE QUOTE"
     return $ regexTreeBuilder strings
 
--- parseWith :: Parser a -> String -> Either ParseError a
--- parseWith p = parse p ""
-
--- -- \d
--- digitP :: Parser Char
--- digitP = oneOf ['0'..'9']
-
--- -- \d+
--- digitsP :: Parser String
--- digitsP = many1 digitP
-
 maybeSpaceP :: Parser String
 maybeSpaceP = many $ oneOf " \n\t"
 
 spaceP :: Parser String
 spaceP = many1 $ oneOf " \n\t"
 
--- idP :: Parser String
--- idP = liftM2 (:) identFirst (many identRest)
---   where identFirst = oneOf $ ['a'..'z'] ++ ['A'..'Z']
---         underScore = oneOf "_"
---         identRest  = identFirst <|> digitP <|> underScore
 
 --- ### Expression parsers
 
+--- #### Read a number (integer) value
 numP :: ParsecT String () Identity Exp
 numP = ValExp . IntVal <$> int <?> "an integer"
 
+--- #### Read a string (regex) value
 strP :: ParsecT String () Identity Exp
 strP = ValExp . RegexVal False <$> str <?> "a string"
 
+--- #### Read a variable name value
 varP :: ParsecT String () Identity Exp
 varP = VarExp <$> var <?> "a variable"
 
+--- #### Read an assignment from variable name to a simple expression
 assignmentP :: ParsecT String () Identity Exp
 assignmentP = try $ do
     var <- var <?> "a variable"
@@ -122,6 +116,7 @@ concatOpP = try $ do
     exp2 <- concatOpP <|> varP <|> strP <?> "a variable or string or another concat operator"
     return (OperatorExp "concat" exp1 (Just exp2) Nothing)
 
+-- TODO: Move this under assignment 
 elementOpP :: ParsecT String () Identity Exp
 elementOpP = try $ do
     var <- varP <?> "a variable"

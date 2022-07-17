@@ -22,7 +22,7 @@ parseStringToTree = testGroup "Parse Regex String to Regex Tree"
   [ testGroup "Parsing Single Literal"
     [ regexTestHelper "a" (Literal "a")
     , regexTestHelper "1" (Literal "1")
-    , regexTestHelper "." (AnyCharLiteral)
+    , regexTestHelper "." AnyCharLiteral
     ]
   , testGroup "Parsing Escaped Literal"
     [ regexTestHelper "\\\\" (Literal "\\\\")
