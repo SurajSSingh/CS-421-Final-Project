@@ -7,14 +7,17 @@ import qualified Data.Maybe
 
 ---
 requireEscapeRegexSymbol :: [String]
-requireEscapeRegexSymbol = ["\\(", "\\)", "\\|", "\\?", "\\*", "\\+", "\\$", "\\."]
+requireEscapeRegexSymbol = ["(", ")", "|", "?", "*", "+", "$", "."]
+
+escapedRegexSymbol :: [String]
+escapedRegexSymbol = ["\\(", "\\)", "\\|", "\\?", "\\*", "\\+", "\\$", "\\."]
 
 --- ### Environment
 type Env = H.HashMap String [Exp]
 type EvalState a = StateT Env (Except Diagnostic) a
 
 --- ### Regex Tree
---- Nodes: Empty, epsilon, exact string, numbered capture group, repetition (lazy or greedy) from M to N?
+--- Nodes: Empty, epsilon, (sigma - any char), exact string, numbered capture group, repetition (lazy or greedy) from M to N?
 --- Adapted from Definition 3.1 of 
 data RegexTree = EmptySet
                | Epsilon
@@ -27,25 +30,26 @@ data RegexTree = EmptySet
             --    | SetChoice [RegexTree]
                | Repetition Bool Int (Maybe Int) RegexTree
                deriving (Eq
-                        , Show
+                        -- , Show
                         )
 
--- instance Show RegexTree where
---     show EmptySet = "{}"
---     show Epsilon = ""
---     show (Literal lit) = lit
---     show (Sequence seq) = concatMap show seq
---     show (BinChoice n1 n2) = show n1 ++ "|" ++ show n2
---     show (CaptureGroup num node) = "(<"++ show num ++ "> "++ show node ++ ")"
---     show (Repetition isLazy start end node) = do
---         lazySym <- if isLazy then "?" else ""
---         repeatSym <- case (start, end) of
---             (0,Just 1) -> "?"
---             (0,Nothing) -> "*"
---             (1,Nothing) -> "+"
---             (s ,Nothing) -> "{" ++ show s ++ "}"
---             (s ,Just e) -> "{" ++ show s ++ "," ++ show e ++ "}"
---         show node ++ [repeatSym] ++ [lazySym]
+instance Show RegexTree where
+    show EmptySet = "{}"
+    show Epsilon = ""
+    show AnyCharLiteral = "."
+    show (Literal lit) = if lit `elem` requireEscapeRegexSymbol then "\\" ++ lit else lit
+    show (Sequence seq) = concatMap show seq
+    show (BinChoice n1 n2) = show n1 ++ "|" ++ show n2
+    show (CaptureGroup num node) = "(<"++ show num ++ "> "++ show node ++ ")"
+    show (Repetition isLazy start end node) = do
+        lazySym <- if isLazy then "?" else ""
+        repeatSym <- case (start, end) of
+            (0,Just 1) -> "?"
+            (0,Nothing) -> "*"
+            (1,Nothing) -> "+"
+            (s ,Nothing) -> "{" ++ show s ++ "}"
+            (s ,Just e) -> "{" ++ show s ++ "," ++ show e ++ "}"
+        show node ++ [repeatSym] ++ [lazySym]
 
 regexTreeSeqHelper :: [RegexTree] -> RegexTree
 regexTreeSeqHelper [] = EmptySet -- illegal pattern
@@ -84,7 +88,7 @@ regexTreeBuilder strings = fst $ regexTreeBuilderAux strings [] 1
                 (rTree, next) = case cs of
                     "?":n -> (regexTreeRepHelper True 0 Nothing before, n)
                     _ -> (regexTreeRepHelper False 0 Nothing before , cs)
-          er | er `elem` requireEscapeRegexSymbol   -> regexTreeBuilderAux cs (before ++ [Literal lr]) num
+          er | er `elem` escapedRegexSymbol   -> regexTreeBuilderAux cs (before ++ [Literal lr]) num
             where
               lr = Data.Maybe.fromMaybe er (stripPrefix "\\" er)
           "." -> regexTreeBuilderAux cs (before ++ [AnyCharLiteral]) num
@@ -94,6 +98,7 @@ regexTreeBuilder strings = fst $ regexTreeBuilderAux strings [] 1
 --- ### Values
 data Val = BoolVal Bool
          | IntVal Int
+         | ResultVal String
          | RegexVal Bool String -- RegexTree
          | Null
          deriving (Eq)
@@ -101,7 +106,8 @@ data Val = BoolVal Bool
 instance Show Val where
     show (BoolVal b) = show b
     show (IntVal i) = show i
-    show (RegexVal b r) = "(" ++ show r ++ ")" ++ if b then "^C" else ""
+    show (ResultVal r) = show r
+    show (RegexVal b r) = if b then "~" else "" ++ "(<0>" ++ show r ++ ")"
     show Null = show "NULL"
 
 --- ### Expressions
@@ -137,7 +143,12 @@ instance Show Exp where
       Just s -> "Running " ++ op ++ " on var " ++ show s
 
 data Diagnostic = UnimplementedError String
+                | InvalidOperation String
                 deriving (Eq)
 
 instance Show Diagnostic where
     show (UnimplementedError x) = x ++ " Unimplemented"
+    show (InvalidOperation x) = "Operation " ++ show x ++ " does not exist"
+
+unimplemented :: String -> EvalState a
+unimplemented = throwError . UnimplementedError
