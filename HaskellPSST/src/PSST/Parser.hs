@@ -8,12 +8,26 @@ import Text.Parsec.Prim hiding (State, try)
 import Control.Monad
 import qualified Data.Maybe
 import Data.List
+import Data.Char
 
 type Parser = ParsecT String () Identity
 
 --- ### Helper Info
 keywords :: [String]
-keywords = ["extract", "replace", "replaceAll", ":e", ":r", ":R", "clear", "check", "state", "solve"]
+keywords = ["extract", "replace", "replaceAll", ":e", ":r", ":R", "clear", "check", "state", "solve", "unify", ":u", "subset", "singleton"]
+digits :: [String]
+digits = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]
+
+numberStringSpliter :: [String] -> (Maybe Int, [String])
+numberStringSpliter = aux []
+    where
+        aux :: [String] -> [String] -> (Maybe Int, [String])
+        aux [] [] = (Nothing, [])
+        aux [] c = (Nothing, c)
+        aux n [] = (Just (read (intercalate "" n) :: Int), [])
+        aux n c@(x:xs) = if x `elem` digits then aux (n ++ [x]) xs else (Just (read (intercalate "" n) :: Int), c)
+
+
 
 --- ### Helper Functions for Regex Tree building
 regexTreeSeqHelper :: [RegexTree] -> RegexTree
@@ -59,6 +73,10 @@ regexTreeBuilder strings = fst $ regexTreeBuilderAux strings [] 1
             where
               lr = Data.Maybe.fromMaybe er (stripPrefix "\\" er)
           "." -> regexTreeBuilderAux cs (before ++ [AnyCharLiteral]) num
+          "$" -> regexTreeBuilderAux next (before ++ [cgStub]) num
+            where
+                (cgNum, next) =  numberStringSpliter cs
+                cgStub = CaptureGroupStub cgNum
           c   -> regexTreeBuilderAux cs (before ++ [Literal c]) num
         regexTreeBuilderAux [] before num = (regexTreeSeqHelper before, (num, []))
 

@@ -3,6 +3,7 @@ import Data.HashMap.Strict as H
 import Control.Monad.State
 import Control.Monad.Except
 import Data.List
+import Data.Maybe
 
 ---
 requireEscapeRegexSymbol :: [String]
@@ -23,6 +24,7 @@ data RegexTree = EmptySet
                | AnyCharLiteral
                | Literal String
                | CaptureGroup Int RegexTree
+               | CaptureGroupStub (Maybe Int)
                | Sequence [RegexTree]
                | BinChoice RegexTree RegexTree
                | Repetition Bool Int (Maybe Int) RegexTree
@@ -38,6 +40,9 @@ instance Show RegexTree where
     show (Sequence seq) =  concatMap show seq
     show (BinChoice n1 n2) = show n1 ++ "|" ++ show n2
     show (CaptureGroup num node) = "<$"++ show num ++ ":("++ show node ++ ")>"
+    show (CaptureGroupStub num) = case num of
+        Nothing ->"<$INVALID STUB$>" 
+        Just n -> "<$"++ show n ++ ">"
     show (Repetition isLazy start end node) =
         let
         lazySym = if isLazy then "?" else ""
@@ -51,15 +56,13 @@ instance Show RegexTree where
             show node ++ repeatSym ++ lazySym
 
 --- ### Values
-data Val = BoolVal Bool
-         | IntVal Int
+data Val = IntVal Int
          | ResultVal String
          | RegexVal Bool RegexTree
          | Void
          deriving (Eq)
 
 instance Show Val where
-    show (BoolVal b) = show b
     show (IntVal i) = show i
     show (ResultVal r) = r
     show (RegexVal b r) = if b then "~" else "" ++ "<$0:(" ++ show r ++ ")>"
