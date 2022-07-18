@@ -18,7 +18,7 @@ keywords = ["extract", "replace", "replaceAll", ":e", ":r", ":R", "clear", "chec
 --- ### Helper Functions for Regex Tree building
 regexTreeSeqHelper :: [RegexTree] -> RegexTree
 regexTreeSeqHelper [] = EmptySet -- illegal pattern
-regexTreeSeqHelper [tree] = tree
+regexTreeSeqHelper [tree] = tree -- Return single item as itself (no sequence needed)
 regexTreeSeqHelper trees = Sequence trees
 
 regexTreeRepHelper ::  Bool -> Int -> Maybe Int -> [RegexTree] -> [RegexTree]
@@ -31,7 +31,9 @@ regexTreeBuilder strings = fst $ regexTreeBuilderAux strings [] 1
     where
         regexTreeBuilderAux :: [String] ->  [RegexTree] -> Int -> (RegexTree, (Int, [String]))
         regexTreeBuilderAux (c:cs) before num = case c of
-          "|" -> (BinChoice (regexTreeSeqHelper before) $ fst $ regexTreeBuilderAux cs [] num, (num, []))
+          "|" -> (BinChoice (regexTreeSeqHelper before) after, res)
+            where
+                (after, res) = regexTreeBuilderAux cs [] num
           "(" -> regexTreeBuilderAux nextCs (before ++ [group]) finalNum
             where
                 res = regexTreeBuilderAux cs [] (num+1)
@@ -59,7 +61,7 @@ regexTreeBuilder strings = fst $ regexTreeBuilderAux strings [] 1
           "." -> regexTreeBuilderAux cs (before ++ [AnyCharLiteral]) num
           c   -> regexTreeBuilderAux cs (before ++ [Literal c]) num
         regexTreeBuilderAux [] before num = (regexTreeSeqHelper before, (num, []))
-        
+
 --- ### Lexers
 --- #### Notes to self:
 ---     * spaces = 0 or more spaces
@@ -108,9 +110,9 @@ str = do
 escape :: Parser String
 escape = do
     d <- char '\\'
-    c <- oneOf $ 
+    c <- oneOf $
         ['\\','"','0','n','r','v','t','b','f'] -- all regular characters which can be escaped
-        ++ 
+        ++
         ['(', ')', '|', '?', '*', '+', '$', '.'] -- all regex characters which can be escaped
     return [d, c]
 

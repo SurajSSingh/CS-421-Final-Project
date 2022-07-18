@@ -16,8 +16,14 @@ orgStrVars env = intercalate "\n\n" $ Prelude.map orgStrVarWithExprs (toList env
 extractOp :: Exp -> Maybe Exp -> Maybe Exp -> EvalState Exp
 extractOp _ _ _ = unimplemented "Extract Operation"
 
+replaceOp :: Exp -> Maybe Exp -> Maybe Exp -> EvalState Exp
+replaceOp _ _ _ = unimplemented "Replace Operation"
+
+replaceAllOp :: Exp -> Maybe Exp -> Maybe Exp -> EvalState Exp
+replaceAllOp _ _ _ = unimplemented "Replace All Operation"
+
 checkOp:: Maybe String -> HashMap String [Exp] -> EvalState Exp
-checkOp var env = unimplemented "Check Operation"
+checkOp var env = unimplemented "Check/Solve Operation"
 
 stateOp:: Maybe String -> HashMap String [Exp] -> EvalState Exp
 stateOp var env = return $ ValExp . ResultVal $ "\n" ++ orgStrVars env ++ "\n\n"
@@ -34,8 +40,8 @@ clearOp var env = do
 
 expOperations :: HashMap String (Exp -> Maybe Exp -> Maybe Exp -> EvalState Exp)
 expOperations = fromList [ ("extract", extractOp)
-                         , ("replace", extractOp)
-                         , ("replaceAll", extractOp)
+                         , ("replace", replaceOp)
+                         , ("replaceAll", replaceAllOp)
                          ]
 stateOperations :: HashMap String (Maybe String -> HashMap String [Exp] -> EvalState Exp)
 stateOperations = fromList [ ("check", checkOp)
