@@ -6,6 +6,8 @@ import Text.ParserCombinators.Parsec hiding (Parser, State)
 import Text.ParserCombinators.Parsec.Expr
 import Text.Parsec.Prim hiding (State, try)
 import Control.Monad
+import qualified Data.Maybe
+import Data.List
 
 type Parser = ParsecT String () Identity
 
@@ -13,6 +15,51 @@ type Parser = ParsecT String () Identity
 keywords :: [String]
 keywords = ["extract", "replace", "replaceAll", "in", ":e", ":r", ":R", "clear", "check"]
 
+--- ### Helper Functions for Regex Tree building
+regexTreeSeqHelper :: [RegexTree] -> RegexTree
+regexTreeSeqHelper [] = EmptySet -- illegal pattern
+regexTreeSeqHelper [tree] = tree
+regexTreeSeqHelper trees = Sequence trees
+
+regexTreeRepHelper ::  Bool -> Int -> Maybe Int -> [RegexTree] -> [RegexTree]
+regexTreeRepHelper lazy start end [] = [EmptySet] -- illegal pattern
+regexTreeRepHelper lazy start end [tree] = [Repetition lazy start end tree]
+regexTreeRepHelper lazy start end (t:ts) = t : regexTreeRepHelper lazy start end ts
+
+regexTreeBuilder :: [String] -> RegexTree
+regexTreeBuilder strings = fst $ regexTreeBuilderAux strings [] 1
+    where
+        regexTreeBuilderAux :: [String] ->  [RegexTree] -> Int -> (RegexTree, (Int, [String]))
+        regexTreeBuilderAux (c:cs) before num = case c of
+          "|" -> (BinChoice (regexTreeSeqHelper before) $ fst $ regexTreeBuilderAux cs [] num, (num, []))
+          "(" -> regexTreeBuilderAux nextCs (before ++ [group]) finalNum
+            where
+                res = regexTreeBuilderAux cs [] (num+1)
+                group = CaptureGroup num $ fst res
+                (finalNum, nextCs) = snd res
+          ")" -> (regexTreeSeqHelper before, (num, cs))
+          "?" -> regexTreeBuilderAux next rTree num
+            where
+                (rTree, next) = case cs of
+                    "?":n -> (regexTreeRepHelper True 0 (Just 1) before, n)
+                    _ -> (regexTreeRepHelper False 0 (Just 1) before , cs)
+          "+" -> regexTreeBuilderAux next rTree num
+            where
+                (rTree, next) = case cs of
+                    "?":n -> (regexTreeRepHelper True 1 Nothing before, n)
+                    _ -> (regexTreeRepHelper False 1 Nothing before , cs)
+          "*" -> regexTreeBuilderAux next rTree num
+            where
+                (rTree, next) = case cs of
+                    "?":n -> (regexTreeRepHelper True 0 Nothing before, n)
+                    _ -> (regexTreeRepHelper False 0 Nothing before , cs)
+          er | er `elem` escapedRegexSymbol   -> regexTreeBuilderAux cs (before ++ [Literal lr]) num
+            where
+              lr = Data.Maybe.fromMaybe er (stripPrefix "\\" er)
+          "." -> regexTreeBuilderAux cs (before ++ [AnyCharLiteral]) num
+          c   -> regexTreeBuilderAux cs (before ++ [Literal c]) num
+        regexTreeBuilderAux [] before num = (regexTreeSeqHelper before, (num, []))
+        
 --- ### Lexers
 --- #### Notes to self:
 ---     * spaces = 0 or more spaces
@@ -95,7 +142,7 @@ numP = ValExp . IntVal <$> int <?> "an integer"
 
 --- #### Read a string (regex) value
 strP :: ParsecT String () Identity Exp
-strP = ValExp . RegexVal False <$> str <?> "a string"
+strP = ValExp . RegexVal False <$> regex <?> "a regex string"
 
 --- #### Read a variable name value
 varP :: ParsecT String () Identity Exp

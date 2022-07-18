@@ -2,8 +2,6 @@ module PSST.Core where
 import Data.HashMap.Strict as H
 import Control.Monad.State
 import Control.Monad.Except
-import Data.List
-import qualified Data.Maybe
 
 ---
 requireEscapeRegexSymbol :: [String]
@@ -51,62 +49,18 @@ instance Show RegexTree where
             (s ,Just e) -> "{" ++ show s ++ "," ++ show e ++ "}"
         show node ++ [repeatSym] ++ [lazySym]
 
-regexTreeSeqHelper :: [RegexTree] -> RegexTree
-regexTreeSeqHelper [] = EmptySet -- illegal pattern
-regexTreeSeqHelper [tree] = tree
-regexTreeSeqHelper trees = Sequence trees
-
-regexTreeRepHelper ::  Bool -> Int -> Maybe Int -> [RegexTree] -> [RegexTree]
-regexTreeRepHelper lazy start end [] = [EmptySet] -- illegal pattern
-regexTreeRepHelper lazy start end [tree] = [Repetition lazy start end tree]
-regexTreeRepHelper lazy start end (t:ts) = t : regexTreeRepHelper lazy start end ts
-
-regexTreeBuilder :: [String] -> RegexTree
-regexTreeBuilder strings = fst $ regexTreeBuilderAux strings [] 1
-    where
-        regexTreeBuilderAux :: [String] ->  [RegexTree] -> Int -> (RegexTree, (Int, [String]))
-        regexTreeBuilderAux (c:cs) before num = case c of
-          "|" -> (BinChoice (regexTreeSeqHelper before) $ fst $ regexTreeBuilderAux cs [] num, (num, []))
-          "(" -> regexTreeBuilderAux nextCs (before ++ [group]) finalNum
-            where
-                res = regexTreeBuilderAux cs [] (num+1)
-                group = CaptureGroup num $ fst res
-                (finalNum, nextCs) = snd res
-          ")" -> (regexTreeSeqHelper before, (num, cs))
-          "?" -> regexTreeBuilderAux next rTree num
-            where
-                (rTree, next) = case cs of
-                    "?":n -> (regexTreeRepHelper True 0 (Just 1) before, n)
-                    _ -> (regexTreeRepHelper False 0 (Just 1) before , cs)
-          "+" -> regexTreeBuilderAux next rTree num
-            where
-                (rTree, next) = case cs of
-                    "?":n -> (regexTreeRepHelper True 1 Nothing before, n)
-                    _ -> (regexTreeRepHelper False 1 Nothing before , cs)
-          "*" -> regexTreeBuilderAux next rTree num
-            where
-                (rTree, next) = case cs of
-                    "?":n -> (regexTreeRepHelper True 0 Nothing before, n)
-                    _ -> (regexTreeRepHelper False 0 Nothing before , cs)
-          er | er `elem` escapedRegexSymbol   -> regexTreeBuilderAux cs (before ++ [Literal lr]) num
-            where
-              lr = Data.Maybe.fromMaybe er (stripPrefix "\\" er)
-          "." -> regexTreeBuilderAux cs (before ++ [AnyCharLiteral]) num
-          c   -> regexTreeBuilderAux cs (before ++ [Literal c]) num
-        regexTreeBuilderAux [] before num = (regexTreeSeqHelper before, (num, []))
-
 --- ### Values
 data Val = BoolVal Bool
          | IntVal Int
          | ResultVal String
-         | RegexVal Bool String -- RegexTree
+         | RegexVal Bool RegexTree
          | Null
          deriving (Eq)
 
 instance Show Val where
     show (BoolVal b) = show b
     show (IntVal i) = show i
-    show (ResultVal r) = show r
+    show (ResultVal r) = r
     show (RegexVal b r) = if b then "~" else "" ++ "(<0>" ++ show r ++ ")"
     show Null = show "NULL"
 
@@ -144,11 +98,13 @@ instance Show Exp where
 
 data Diagnostic = UnimplementedError String
                 | InvalidOperation String
+                | VariableNotFound String
                 deriving (Eq)
 
 instance Show Diagnostic where
     show (UnimplementedError x) = x ++ " Unimplemented"
     show (InvalidOperation x) = "Operation " ++ show x ++ " does not exist"
+    show (VariableNotFound x) = "Variable " ++ show x ++ " is not defined"
 
 unimplemented :: String -> EvalState a
 unimplemented = throwError . UnimplementedError
