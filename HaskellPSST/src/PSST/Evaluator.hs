@@ -1,6 +1,7 @@
 module PSST.Evaluator (eval) where
 
 import PSST.Core
+import PSST.RTOperations
 import qualified Data.HashMap.Strict as H (HashMap, insert, lookup, empty, fromList, union, delete)
 import Control.Monad.State
 import Control.Monad.Except
