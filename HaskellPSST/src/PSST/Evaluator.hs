@@ -1,20 +1,36 @@
 module PSST.Evaluator (eval) where
 
 import PSST.Core
-import qualified Data.HashMap.Strict as H (HashMap, insert, lookup, empty, fromList, union)
+import qualified Data.HashMap.Strict as H (HashMap, insert, lookup, empty, fromList, union, delete)
 import Control.Monad.State
 import Control.Monad.Except
 import Data.List
 import Data.HashMap.Strict
 
+orgStrVarWithExprs :: (String, [Exp]) -> String
+orgStrVarWithExprs (var, exps) =  intercalate "\n" (Prelude.map (\e -> var ++ " = " ++ show e) exps)
+
+orgStrVars :: HashMap String [Exp] -> [Char]
+orgStrVars env = intercalate "\n\n" $ Prelude.map orgStrVarWithExprs (toList env)
+
 extractOp :: Exp -> Maybe Exp -> Maybe Exp -> EvalState Exp
 extractOp _ _ _ = unimplemented "Extract Operation"
 
 checkOp:: Maybe String -> HashMap String [Exp] -> EvalState Exp
-checkOp op env = unimplemented "Check Operation"
+checkOp var env = unimplemented "Check Operation"
+
+stateOp:: Maybe String -> HashMap String [Exp] -> EvalState Exp
+stateOp var env = return $ ValExp . ResultVal $ "\n" ++ orgStrVars env ++ "\n\n"
 
 clearOp :: Maybe String -> HashMap String [Exp] -> EvalState Exp
-clearOp op env = unimplemented "Clear Operation"
+clearOp var env = do
+    case var of
+      Nothing -> do
+        modify $ const empty
+        return $ ValExp . ResultVal $ "Cleared Solver State"
+      Just s -> do
+        modify $ H.delete s
+        return $ ValExp . ResultVal $ "Removed " ++ s ++ " from solver"
 
 expOperations :: HashMap String (Exp -> Maybe Exp -> Maybe Exp -> EvalState Exp)
 expOperations = fromList [ ("extract", extractOp)
@@ -23,7 +39,9 @@ expOperations = fromList [ ("extract", extractOp)
                          ]
 stateOperations :: HashMap String (Maybe String -> HashMap String [Exp] -> EvalState Exp)
 stateOperations = fromList [ ("check", checkOp)
-                           , ("clear", checkOp)
+                           , ("solve", checkOp)
+                           , ("clear", clearOp)
+                           , ("state", stateOp)
                            ]
 
 mapListAdd var val env = case H.lookup var env of
@@ -40,7 +58,7 @@ eval (VarExp var) = do
     env <- get
     case H.lookup var env of
       Nothing -> throwError $ VariableNotFound var
-      Just exps -> return $ ValExp $ ResultVal $ intercalate "\n" (Prelude.map (\e -> var ++ " = " ++ show e) exps)
+      Just exps -> return $ ValExp $ ResultVal $ orgStrVarWithExprs (var,exps)
 
 --- ### AssignmentExp expressions --> modify the environment with variable and value
 eval (AssignmentExp var val) = do

@@ -13,7 +13,7 @@ type Parser = ParsecT String () Identity
 
 --- ### Helper Info
 keywords :: [String]
-keywords = ["extract", "replace", "replaceAll", "in", ":e", ":r", ":R", "clear", "check"]
+keywords = ["extract", "replace", "replaceAll", ":e", ":r", ":R", "clear", "check", "state", "solve"]
 
 --- ### Helper Functions for Regex Tree building
 regexTreeSeqHelper :: [RegexTree] -> RegexTree
@@ -207,9 +207,14 @@ clearOpP = try $ do
 
 checkOpP :: ParsecT String () Identity Exp
 checkOpP = try $ do
-    clear <- symbol "check"
+    clear <- symbol "check" <|> symbol "solve"
     variable <- optionMaybe var
     return $ StateOpExp clear variable
+
+stateOpP :: ParsecT String () Identity Exp
+stateOpP = try $ do
+    state <- symbol "state"
+    return $ StateOpExp state Nothing
 
 simpleExprP :: Parser Exp
 simpleExprP = numP
@@ -225,6 +230,7 @@ simpleExprP = numP
 rawExprP :: Parser Exp
 rawExprP = checkOpP
        <|> clearOpP
+       <|> stateOpP
        <|> simpleExprP
        <?> "a value"
 
