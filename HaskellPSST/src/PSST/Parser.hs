@@ -163,14 +163,6 @@ concatOpP = try $ do
     exp2 <- concatOpP <|> varP <|> strP <?> "a variable or string or another concat operator"
     return (OperatorExp "concat" exp1 (Just exp2) Nothing)
 
--- TODO: Move this under assignment 
-elementOpP :: ParsecT String () Identity Exp
-elementOpP = try $ do
-    var <- varP <?> "a variable"
-    symbol "in"
-    set <- strP <?> "a string"
-    return (OperatorExp "element" var (Just set) Nothing)
-
 extractOpP :: ParsecT String () Identity Exp
 extractOpP = try $ do
     symbol "extract" <|> symbol ":e"
@@ -219,8 +211,7 @@ simpleExprP = numP
             <?> "a simple value"
 
 rawExprP :: Parser Exp
-rawExprP = elementOpP
-       <|> checkOpP
+rawExprP = checkOpP
        <|> clearOpP
        <|> simpleExprP
        <?> "a value"

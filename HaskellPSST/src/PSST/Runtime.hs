@@ -25,13 +25,18 @@ repl main env = do
     input <- readString
     if input `elem` quitCommands
         then do
-            print "Closing Solver" 
+            print "Closing Solver"
             return ()
         else
             case strSolParse input of
                 Right exp ->
                     case runExcept $ runStateT (eval exp) env of
-                    Right (val, env) -> print val
-                    Left eErr -> print eErr
-                Left pErr -> print pErr
-        >> repl main env
+                    Right (val, newEnv) -> do
+                        print val
+                        repl main newEnv
+                    Left eErr -> do
+                        print eErr
+                        repl main env
+                Left pErr -> do
+                    print pErr
+                    repl main env
