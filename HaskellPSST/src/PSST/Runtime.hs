@@ -23,12 +23,14 @@ readString = putStr replPrompt
 repl :: IO () -> Env -> IO ()
 repl main env = do
     input <- readString
-    if input `elem` quitCommands
-        then do
+    case input of 
+        i | i `elem` quitCommands -> do 
             print "Closing Solver"
             return ()
-        else
-            case strSolParse input of
+        help | help == "help" -> do
+            print "HELP:"
+            repl main env
+        _ -> case strSolParse input of
                 Right exp ->
                     case runExcept $ runStateT (eval exp) env of
                     Right (val, newEnv) -> do

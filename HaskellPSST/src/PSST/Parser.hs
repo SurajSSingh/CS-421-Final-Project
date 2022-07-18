@@ -166,25 +166,37 @@ concatOpP = try $ do
 extractOpP :: ParsecT String () Identity Exp
 extractOpP = try $ do
     symbol "extract" <|> symbol ":e"
+    maybeSpaceP
     i <- numP <?> "a number"
+    maybeSpaceP
     e <- strP <?> "a string"
+    maybeSpaceP
     x <- varP <?> "a variable"
+    maybeSpaceP
     return (OperatorExp "extract" i (Just e) (Just x))
 
 replaceOpP :: ParsecT String () Identity Exp
 replaceOpP = try $ do
     symbol "replace" <|> symbol ":r"
+    maybeSpaceP
     pat <- strP <?> "a string"
+    maybeSpaceP
     rep <- strP <?> "a string"
+    maybeSpaceP
     x <- varP <?> "a variable"
+    maybeSpaceP
     return (OperatorExp "replace" pat (Just rep) (Just x))
 
 replaceAllOpP :: ParsecT String () Identity Exp
 replaceAllOpP = try $ do
     symbol "replaceAll" <|> symbol ":R"
+    maybeSpaceP
     pat <- strP <?> "a string"
+    maybeSpaceP
     rep <- strP <?> "a string"
+    maybeSpaceP
     x <- varP <?> "a variable"
+    maybeSpaceP
     return (OperatorExp "replaceAll" pat (Just rep) (Just x))
 
 clearOpP :: ParsecT String () Identity Exp
