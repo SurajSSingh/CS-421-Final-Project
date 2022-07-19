@@ -31,14 +31,18 @@ numberStringSpliter = aux []
 
 --- ### Helper Functions for Regex Tree building
 regexTreeSeqHelper :: [RegexTree] -> RegexTree
-regexTreeSeqHelper [] = EmptySet -- illegal pattern
+regexTreeSeqHelper [] = Epsilon
 regexTreeSeqHelper [tree] = tree -- Return single item as itself (no sequence needed)
-regexTreeSeqHelper trees = Sequence trees
+regexTreeSeqHelper trees@(t:ts) = case t of 
+    Epsilon -> Sequence ts
+    _ -> Sequence trees
 
 regexTreeRepHelper ::  Bool -> Int -> Maybe Int -> [RegexTree] -> [RegexTree]
-regexTreeRepHelper lazy start end [] = [EmptySet] -- illegal pattern
+regexTreeRepHelper lazy start end [] = [Epsilon]
 regexTreeRepHelper lazy start end [tree] = [Repetition lazy start end tree]
-regexTreeRepHelper lazy start end (t:ts) = t : regexTreeRepHelper lazy start end ts
+regexTreeRepHelper lazy start end (t:ts) = case t of 
+    Epsilon -> regexTreeRepHelper lazy start end ts
+    _ -> t : regexTreeRepHelper lazy start end ts
 
 regexTreeBuilder :: [String] -> RegexTree
 regexTreeBuilder strings = fst $ regexTreeBuilderAux strings [] 1
@@ -117,13 +121,6 @@ escapeQuote = do
 character :: Parser String
 character = fmap return (noneOf "\\`") <|> escapeQuote
 
-str :: Parser String
-str = do
-    symbol "`"
-    strings <- many character
-    symbol "`"
-    return $ concat strings
-
 
 escape :: Parser String
 escape = do
@@ -162,7 +159,13 @@ numP = ValExp . IntVal <$> int <?> "an integer"
 
 --- #### Read a string (regex) value
 strP :: ParsecT String () Identity Exp
-strP = ValExp . RegexVal False <$> regex <?> "a regex string"
+strP = do
+    complement <- optionMaybe $ symbol "!" <|> symbol "~"
+    r <- regex <?> "a regex string"
+    case complement of
+      Nothing -> return $ ValExp $ RegexVal False r 
+      Just s -> return $ ValExp $ RegexVal True r 
+    
 
 --- #### Read a variable name value
 varP :: ParsecT String () Identity Exp
@@ -179,7 +182,7 @@ assignmentP = try $ do
 concatOpP :: ParsecT String () Identity Exp
 concatOpP = try $ do
     exp1 <- varP <|> strP <?> "a variable or string"
-    symbol "+"
+    symbol "+" <|> symbol "++"
     exp2 <- concatOpP <|> varP <|> strP <?> "a variable or string or another concat operator"
     return (OperatorExp "concat" exp1 (Just exp2) Nothing)
 

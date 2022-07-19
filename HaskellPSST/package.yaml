@@ -28,9 +28,9 @@ dependencies:
 library:
   source-dirs: src
   exposed-modules:
-  - PSST.Transducer
   - PSST.Core
   - PSST.Parser
+  - PSST.RTOperations
   - PSST.Evaluator
   - PSST.Runtime
 

@@ -25,14 +25,14 @@ source-repository head
 
 library
   exposed-modules:
-      PSST.Transducer
       PSST.Core
       PSST.Parser
+      PSST.RTOperations
       PSST.Evaluator
       PSST.Runtime
   other-modules:
       Lib
-      PSST.RTOperations
+      PSST.Transducer
       Paths_HaskellPSST
   hs-source-dirs:
       src
@@ -62,6 +62,9 @@ test-suite HaskellPSST-test
   type: exitcode-stdio-1.0
   main-is: Spec.hs
   other-modules:
+      EvalTests
+      ParserTests
+      RegexTests
       Paths_HaskellPSST
   hs-source-dirs:
       test
