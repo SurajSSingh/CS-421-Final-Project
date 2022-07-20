@@ -30,6 +30,26 @@ updateCaptureGroupNumber (Repetition l s me t) num = (Repetition l s me ut, newN
     (ut, newNum) = updateCaptureGroupNumber t num
 updateCaptureGroupNumber t num = (t, num)
 
+--- Extract Capture Group
+extractCaptureGroup :: Int -> RegexTree -> Maybe RegexTree
+extractCaptureGroup 0 t = Just t
+extractCaptureGroup n (CaptureGroup cg x)
+  | n == cg = Just x
+  | otherwise = extractCaptureGroup n x
+extractCaptureGroup n (BinChoice a b) = case extractCaptureGroup n a of
+  Nothing -> extractCaptureGroup n b
+  Just x -> Just x
+extractCaptureGroup n (Repetition _ _ _ t) = extractCaptureGroup n t
+extractCaptureGroup n (Sequence (x:xs)) = case extractCaptureGroup n x of
+  Nothing -> extractCaptureGroup n (Sequence xs)
+  Just rt -> Just rt
+extractCaptureGroup _ _ = Nothing
+
+--- Match and Update
+matchAndUpdate :: Either Int RegexTree -> RegexTree -> RegexTree -> Maybe RegexTree
+matchAndUpdate (Left 0) _ = Just
+-- matchAndUpdate 
+
 --- ### Regex Tree pattern operations
 --- #### Regex Union: Combines two regex trees with binary choice and updating capture group numbers
 regexTreeUnion :: RegexTree -> RegexTree -> RegexTree
@@ -106,9 +126,10 @@ isRegexSubLang (Literal _) AnyCharLiteral = True
 isRegexSubLang _ _ = False
 
 --- #### Regex Unify: Return a regex tree that unifies two trees to their common pattern
---- ####              , will be empty set if cannot be unified
+---                  , will be empty set if cannot be unified.
+---                  Same effect as doing set intersection on two trees
 regexTreeUnify :: RegexTree -> RegexTree -> RegexTree
---- Sub-language case, use the sub language as unification
+--- Sub-language case, use the sub language as unification (subset or equal to)
 regexTreeUnify t1 t2
   | t1 `isRegexSubLang` t2 = t1
   | t2 `isRegexSubLang` t1 = t2

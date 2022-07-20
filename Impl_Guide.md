@@ -2,6 +2,7 @@
 
 ## My Regex Syntax
 * In-between double quotes ("")
+* Represents a set of accepted strings
 * Each character is treated literally ("a" --> Literal a)
 * If two literals are together, they become a sequence of literals (ab --> Sequence Literal a Literal b)
 * If a literal follows a sequence, it is added to the sequence (ab + c --> Sequence Literal a Literal b Literal c)

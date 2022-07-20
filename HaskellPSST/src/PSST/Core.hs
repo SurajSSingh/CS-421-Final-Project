@@ -16,6 +16,7 @@ escapedRegexSymbol = ["\\(", "\\)", "\\|", "\\?", "\\*", "\\+", "\\$", "\\."]
 type Env = H.HashMap String [Exp]
 type EvalState a = StateT Env (Except Diagnostic) a
 
+data AtLeastTwoList a = AtLeastTwoList {first2PValue :: a, second2PValue :: a, rest2PValue :: [a]}
 --- ### Regex Tree
 --- Nodes: Empty, epsilon, (sigma - any char), exact string, numbered capture group, repetition (lazy or greedy) from M to N?
 --- Adapted from Definition 3.1 of 
@@ -55,6 +56,30 @@ instance Show RegexTree where
         in
             show node ++ repeatSym ++ lazySym
 
+--- ### Helper Functions for Regex Tree building
+---     Allows these assumptions:
+---         1. Sequence will contain at least two items
+---         2. Repetition will apply only to the last item before it
+---         3. Epsilon will be removed, unless it's literally the only thing
+---         4. Binary choice will have two distinct items, with neither being subset of each other
+regexTreeSeqHelper :: [RegexTree] -> RegexTree
+regexTreeSeqHelper [] = Epsilon -- Empty sequence is epsilon
+regexTreeSeqHelper [tree] = tree -- Return single item as itself (no sequence needed)
+regexTreeSeqHelper trees@(t:ts) = case t of
+    Epsilon -> regexTreeSeqHelper ts -- Remove epsilon, continue
+    _ -> case regexTreeSeqHelper ts of
+      EmptySet -> t
+      Epsilon -> t
+      Sequence rts -> Sequence (t:rts)
+      n -> Sequence [t, n]
+
+regexTreeRepHelper ::  Bool -> Int -> Maybe Int -> [RegexTree] -> [RegexTree]
+regexTreeRepHelper lazy start end [] = [Epsilon] -- Repeat epsilon as many times as you want, it's still just epsilon
+regexTreeRepHelper lazy start end [tree] = [Repetition lazy start end tree] -- Last or only item, put repetition on it
+regexTreeRepHelper lazy start end (t:ts) = case t of
+    Epsilon -> regexTreeRepHelper lazy start end ts -- Remove epsilon, continue
+    _ -> t : regexTreeRepHelper lazy start end ts
+
 --- ### Values
 data Val = IntVal Int
          | ResultVal String
@@ -93,14 +118,18 @@ instance Show Exp where
       Just s -> "Running " ++ op ++ " on var " ++ show s
 
 data Diagnostic = UnimplementedError String
-                | InvalidOperation String
-                | VariableNotFound String
+                | InvalidOperationError String
+                | InvalidArgumentsError String [String]
+                | NumOfArgumentsError String Int Int [String]
+                | VariableNotFoundError String
                 deriving (Eq)
 
 instance Show Diagnostic where
     show (UnimplementedError x) = x ++ " Unimplemented"
-    show (InvalidOperation x) = "Operation " ++ show x ++ " does not exist"
-    show (VariableNotFound x) = "Variable " ++ show x ++ " is not defined"
+    show (InvalidOperationError op) = "Operation " ++ show op ++ " does not exist"
+    show (InvalidArgumentsError op args) = "Operation " ++ show op ++ " passed in invalid arguments: " ++ show args
+    show (NumOfArgumentsError op expected given args) = "Operation " ++ show op ++ " passed in " ++ (if expected < given then "too many arguments, " else "too few arguments, ") ++ "given: " ++ show args
+    show (VariableNotFoundError x) = "Variable " ++ show x ++ " is not defined"
 
 unimplemented :: String -> EvalState a
 unimplemented = throwError . UnimplementedError

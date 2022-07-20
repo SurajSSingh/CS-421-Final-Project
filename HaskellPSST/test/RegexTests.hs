@@ -13,7 +13,7 @@ simplePlusRepetition tree = Repetition True 0 Nothing tree
 simpleOptRepetition tree = Repetition True 0 (Just 1) tree
 
 regexTreeTest :: TestTree
-regexTreeTest = testGroup "Regex Tree Operations Tests" [maybeLTETests, updateCaptureGroupNumberTests, unifyTests,subLangTests, singletonTests]
+regexTreeTest = testGroup "Regex Tree Operations Tests" [maybeLTETests, updateCaptureGroupNumberTests, regexTreeUnion, singletonTests, subLangTests, unifyTests]
 
 maybeLTETests :: TestTree
 maybeLTETests = testGroup "Maybe Less Than or Equal To Tests" 
@@ -32,12 +32,19 @@ updateCaptureGroupNumberTests = testGroup "Updating Capture Group Number Tests"
 unifyTests :: TestTree
 unifyTests = testGroup "Regex Tree Unification Tests" 
   []
+  
+unionTests :: TestTree
+unionTests = testGroup "Regex Tree Union Tests" 
+  []
 
 subLangTests :: TestTree
 subLangTests = testGroup "Regex Tree Sub Language Tests" 
   [ emptySetSubLangTests
   , epsilonSubLangTests
-  , literalSubLangTest
+  , literalSubLangTests
+  , anyCharSubLangTests
+  , captureGroupSubLangTests
+  , captureGroupStubSubLangTests
   ]
 
 emptySetSubLangTests = testGroup "Empty Set subset of some Tree" 
@@ -72,7 +79,7 @@ epsilonSubLangTests = testGroup "Epsilon subset of some Tree"
   , testCase "Epsilon/Repetition, More than zero no Epsilon" (isRegexSubLang Epsilon (simplePlusRepetition AnyCharLiteral) @?= False)
   ]
 
-literalSubLangTest = testGroup "Literal subset of some Tree"
+literalSubLangTests = testGroup "Literal subset of some Tree"
   [ testCase "Literal/EmptySet" (isRegexSubLang simpleLiteral EmptySet @?= False)
   , testCase "Literal/Epsilon" (isRegexSubLang simpleLiteral Epsilon @?= False)
   , testCase "Literal/Same Literal" (isRegexSubLang simpleLiteral simpleLiteral @?= True)
@@ -90,6 +97,67 @@ literalSubLangTest = testGroup "Literal subset of some Tree"
   , testCase "Literal/BinChoice, None" (isRegexSubLang simpleLiteral (BinChoice Epsilon Epsilon) @?= False)
   , testCase "Literal/Repetition, 0+" (isRegexSubLang simpleLiteral (simpleStarRepetition simpleLiteral) @?= True)
   , testCase "Literal/Repetition, 2+" (isRegexSubLang simpleLiteral (Repetition False 2 Nothing simpleLiteral) @?= False)
+  ]
+
+anyCharSubLangTests = testGroup "Any Char Literal subset of some Tree"
+  [ testCase "AnyCharLiteral/EmptySet" (isRegexSubLang AnyCharLiteral EmptySet @?= False)
+  , testCase "AnyCharLiteral/Epsilon" (isRegexSubLang AnyCharLiteral Epsilon @?= False)
+  , testCase "AnyCharLiteral/AnyCharLiteral" (isRegexSubLang AnyCharLiteral AnyCharLiteral @?= True)
+  , testCase "AnyCharLiteral/Literal" (isRegexSubLang AnyCharLiteral simpleLiteral @?= False)
+  , testCase "AnyCharLiteral/CaptureGroup with AnyCharLiteral" (isRegexSubLang AnyCharLiteral (simpleCaptureGroup AnyCharLiteral) @?= True)
+  , testCase "AnyCharLiteral/CaptureGroup, not AnyCharLiteral" (isRegexSubLang AnyCharLiteral (simpleCaptureGroup Epsilon) @?= False)
+  , testCase "AnyCharLiteral/CaptureGroupStub" (isRegexSubLang AnyCharLiteral simpleCaptureGroupStub @?= False)
+  , testCase "AnyCharLiteral/Sequence, Empty" (isRegexSubLang AnyCharLiteral (Sequence []) @?= False)
+  , testCase "AnyCharLiteral/Sequence, Single with" (isRegexSubLang AnyCharLiteral (Sequence [AnyCharLiteral]) @?= False)
+  , testCase "AnyCharLiteral/Sequence, Single without" (isRegexSubLang AnyCharLiteral (Sequence [simpleLiteral]) @?= False)
+  , testCase "AnyCharLiteral/Sequence, Multiple" (isRegexSubLang AnyCharLiteral (Sequence [simpleLiteral, AnyCharLiteral]) @?= False)
+  , testCase "AnyCharLiteral/Choice, Both" (isRegexSubLang AnyCharLiteral (BinChoice AnyCharLiteral AnyCharLiteral) @?= True)
+  , testCase "AnyCharLiteral/Choice, Left" (isRegexSubLang AnyCharLiteral (BinChoice AnyCharLiteral Epsilon) @?= True)
+  , testCase "AnyCharLiteral/Choice, Right" (isRegexSubLang AnyCharLiteral (BinChoice Epsilon AnyCharLiteral) @?= True)
+  , testCase "AnyCharLiteral/Choice, None" (isRegexSubLang AnyCharLiteral (BinChoice Epsilon simpleLiteral) @?= False)
+  , testCase "AnyCharLiteral/Repetition 0+" (isRegexSubLang AnyCharLiteral (simpleStarRepetition AnyCharLiteral) @?= True)
+  , testCase "AnyCharLiteral/Epsilon" (isRegexSubLang AnyCharLiteral Epsilon @?= False)
+  ]
+
+captureGroupSubLangTests = testGroup "Capture Group subset of some Tree"
+  [ testCase "CaptureGroup/EmptySet, has subset" (isRegexSubLang (simpleCaptureGroup EmptySet) EmptySet @?= True)
+  , testCase "CaptureGroup/EmptySet, doesn't have subset" (isRegexSubLang (simpleCaptureGroup AnyCharLiteral) EmptySet @?= False)
+  , testCase "CaptureGroup/Epsilon, has subset" (isRegexSubLang (simpleCaptureGroup Epsilon) Epsilon @?= True)
+  , testCase "CaptureGroup/Epsilon, doesn't have subset" (isRegexSubLang (simpleCaptureGroup Epsilon) AnyCharLiteral @?= False)
+  , testCase "CaptureGroup/AnyCharLiter, has subset" (isRegexSubLang (simpleCaptureGroup Epsilon) Epsilon @?= True)
+  , testCase "CaptureGroup/AnyCharLiter, doesn't have subset" (isRegexSubLang (simpleCaptureGroup Epsilon) AnyCharLiteral @?= False)
+  , testCase "CaptureGroup/Literal, has subset" (isRegexSubLang (simpleCaptureGroup Epsilon) Epsilon @?= True)
+  , testCase "CaptureGroup/Literal, doesn't have subset" (isRegexSubLang (simpleCaptureGroup Epsilon) AnyCharLiteral @?= False)
+  , testCase "CaptureGroup/CaptureGroup, has subset" (isRegexSubLang (simpleCaptureGroup Epsilon) (CaptureGroup 100 Epsilon) @?= True)
+  , testCase "CaptureGroup/CaptureGroup, doesn't have subset" (isRegexSubLang (simpleCaptureGroup Epsilon) (CaptureGroup 100  AnyCharLiteral) @?= False)
+  , testCase "CaptureGroup/CaptureGroupStub" (isRegexSubLang (simpleCaptureGroup Epsilon) simpleCaptureGroupStub @?= False)
+  , testCase "CaptureGroup/Sequence, Empty" (isRegexSubLang (simpleCaptureGroup Epsilon) (Sequence []) @?= True)
+  , testCase "CaptureGroup/Sequence, Single, has subset" (isRegexSubLang (simpleCaptureGroup Epsilon) (Sequence [Epsilon]) @?= True)
+  , testCase "CaptureGroup/Sequence, Single, doesn't have subset" (isRegexSubLang (simpleCaptureGroup Epsilon) (Sequence [AnyCharLiteral]) @?= False)
+  , testCase "CaptureGroup/Sequence, Multiple" (isRegexSubLang (simpleCaptureGroup Epsilon) (Sequence [AnyCharLiteral]) @?= False)
+  , testCase "CaptureGroup/BinChoice, has subset" (isRegexSubLang (simpleCaptureGroup Epsilon) Epsilon @?= True)
+  , testCase "CaptureGroup/BinChoice, doesn't have subset" (isRegexSubLang (simpleCaptureGroup Epsilon) AnyCharLiteral @?= False)
+  , testCase "CaptureGroup/BinChoice, has subset" (isRegexSubLang (simpleCaptureGroup Epsilon) Epsilon @?= True)
+  , testCase "CaptureGroup/BinChoice, doesn't have subset" (isRegexSubLang (simpleCaptureGroup Epsilon) AnyCharLiteral @?= False)
+  ]
+
+captureGroupStubSubLangTests = testGroup "Capture Group subset of some Tree"
+  [ testCase "CaptureGroupStub/EmptySet" (isRegexSubLang simpleCaptureGroupStub EmptySet @?= False)
+  , testCase "CaptureGroupStub/Epsilon" (isRegexSubLang simpleCaptureGroupStub Epsilon @?= False)
+  , testCase "CaptureGroupStub/AnyCharLiteral" (isRegexSubLang simpleCaptureGroupStub AnyCharLiteral @?= False)
+  , testCase "CaptureGroupStub/Literal" (isRegexSubLang simpleCaptureGroupStub simpleLiteral @?= False)
+  , testCase "CaptureGroupStub/CaptureGroup" (isRegexSubLang simpleCaptureGroupStub EmptySet @?= False)
+  , testCase "CaptureGroupStub/CaptureGroupStub, same" (isRegexSubLang simpleCaptureGroupStub (CaptureGroupStub Nothing) @?= True)
+  , testCase "CaptureGroupStub/CaptureGroupStub, diff" (isRegexSubLang simpleCaptureGroupStub (CaptureGroupStub $ Just 0) @?= False)
+  , testCase "CaptureGroupStub/Sequence, Empty" (isRegexSubLang simpleCaptureGroupStub (Sequence []) @?= False)
+  , testCase "CaptureGroupStub/Sequence, Single, same" (isRegexSubLang simpleCaptureGroupStub (Sequence [simpleCaptureGroupStub]) @?= True)
+  , testCase "CaptureGroupStub/Sequence, Single, diff" (isRegexSubLang simpleCaptureGroupStub (Sequence [(CaptureGroupStub $ Just 0)]) @?= False)
+  , testCase "CaptureGroupStub/Sequence, Multiple" (isRegexSubLang simpleCaptureGroupStub (Sequence [simpleCaptureGroupStub, AnyCharLiteral]) @?= False)
+  , testCase "CaptureGroupStub/BinChoice, Both" (isRegexSubLang simpleCaptureGroupStub (BinChoice simpleCaptureGroupStub simpleCaptureGroupStub) @?= True)
+  , testCase "CaptureGroupStub/BinChoice, Left" (isRegexSubLang simpleCaptureGroupStub (BinChoice simpleCaptureGroupStub Epsilon) @?= True)
+  , testCase "CaptureGroupStub/BinChoice, Right" (isRegexSubLang simpleCaptureGroupStub (BinChoice Epsilon simpleCaptureGroupStub) @?= True)
+  , testCase "CaptureGroupStub/BinChoice, None" (isRegexSubLang simpleCaptureGroupStub (BinChoice Epsilon AnyCharLiteral) @?= False)
+  , testCase "CaptureGroupStub/Repetition 0+" (isRegexSubLang simpleCaptureGroupStub (simpleStarRepetition simpleCaptureGroupStub) @?= True)
   ]
 
 singletonTests :: TestTree

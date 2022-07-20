@@ -29,31 +29,6 @@ numberStringSpliter = aux []
         aux n c@(x:xs) = if x `elem` digits then aux (n ++ [x]) xs else (Just (read (intercalate "" n) :: Int), c)
 
 
-
---- ### Helper Functions for Regex Tree building
----     Allows these assumptions:
----         1. Sequence will contain at least two items
----         2. Repetition will apply only to the last item before it
----         3. Epsilon will be removed, unless it's literally the only thing
----         4. Binary choice will have two distinct items, with neither being subset of each other
-regexTreeSeqHelper :: [RegexTree] -> RegexTree
-regexTreeSeqHelper [] = Epsilon -- Empty sequence is epsilon
-regexTreeSeqHelper [tree] = tree -- Return single item as itself (no sequence needed)
-regexTreeSeqHelper trees@(t:ts) = case t of
-    Epsilon -> regexTreeSeqHelper ts -- Remove epsilon, continue
-    _ -> case regexTreeSeqHelper ts of
-      EmptySet -> t
-      Epsilon -> t
-      Sequence rts -> Sequence (t:rts)
-      n -> Sequence [t, n]
-
-regexTreeRepHelper ::  Bool -> Int -> Maybe Int -> [RegexTree] -> [RegexTree]
-regexTreeRepHelper lazy start end [] = [Epsilon] -- Repeat epsilon as many times as you want, it's still just epsilon
-regexTreeRepHelper lazy start end [tree] = [Repetition lazy start end tree] -- Last or only item, put repetition on it
-regexTreeRepHelper lazy start end (t:ts) = case t of
-    Epsilon -> regexTreeRepHelper lazy start end ts -- Remove epsilon, continue
-    _ -> t : regexTreeRepHelper lazy start end ts
-
 regexTreeBinHelper :: RegexTree -> RegexTree -> RegexTree
 regexTreeBinHelper Epsilon t2 = Repetition False 0 (Just 1) t2 -- Make t2 optional
 regexTreeBinHelper t1 Epsilon = Repetition False 0 (Just 1) t1 -- Make t1 optional
@@ -242,7 +217,9 @@ subsetOpP = try $ do
     maybeSpaceP
     exp1 <- strP <?> "a string"
     maybeSpaceP
-    return (OperatorExp "subset" exp1 Nothing Nothing)
+    exp2 <- strP <?> "a string"
+    maybeSpaceP
+    return (OperatorExp "subset" exp1 (Just exp2) Nothing)
 
 extractOpP :: ParsecT String () Identity Exp
 extractOpP = try $ do
@@ -252,7 +229,7 @@ extractOpP = try $ do
     maybeSpaceP
     e <- strP <?> "a string"
     maybeSpaceP
-    x <- varP <?> "a variable"
+    x <- strP <?> "a string"
     maybeSpaceP
     return (OperatorExp "extract" i (Just e) (Just x))
 
@@ -314,6 +291,8 @@ rawExprP :: Parser Exp
 rawExprP = checkOpP
        <|> clearOpP
        <|> stateOpP
+       <|> subsetOpP
+       <|> singletonOpP
        <|> simpleExprP
        <?> "a value"
 
