@@ -14,6 +14,9 @@ orgStrVarWithExprs (var, exps) =  intercalate "\n" (Prelude.map (\e -> var ++ " 
 orgStrVars :: HashMap String [Exp] -> [Char]
 orgStrVars env = intercalate "\n\n" $ Prelude.map orgStrVarWithExprs (toList env)
 
+concatOp :: Exp -> Maybe Exp -> Maybe Exp -> EvalState Exp
+concatOp _ _ _ = unimplemented "Concat Operation"
+
 extractOp :: Exp -> Maybe Exp -> Maybe Exp -> EvalState Exp
 extractOp _ _ _ = unimplemented "Extract Operation"
 
@@ -22,6 +25,18 @@ replaceOp _ _ _ = unimplemented "Replace Operation"
 
 replaceAllOp :: Exp -> Maybe Exp -> Maybe Exp -> EvalState Exp
 replaceAllOp _ _ _ = unimplemented "Replace All Operation"
+
+unionOp :: Exp -> Maybe Exp -> Maybe Exp -> EvalState Exp
+unionOp _ _ _ = unimplemented "Union Operation"
+
+unifyOp :: Exp -> Maybe Exp -> Maybe Exp -> EvalState Exp
+unifyOp _ _ _ = unimplemented "Unify Operation"
+
+singletonOp :: Exp -> Maybe Exp -> Maybe Exp -> EvalState Exp
+singletonOp _ _ _ = unimplemented "Singleton Operation"
+
+subsetOp :: Exp -> Maybe Exp -> Maybe Exp -> EvalState Exp
+subsetOp _ _ _ = unimplemented "Subset Operation"
 
 checkOp:: Maybe String -> HashMap String [Exp] -> EvalState Exp
 checkOp var env = unimplemented "Check/Solve Operation"
@@ -40,13 +55,14 @@ clearOp var env = do
         return $ ValExp . ResultVal $ "Removed " ++ s ++ " from solver"
 
 expOperations :: HashMap String (Exp -> Maybe Exp -> Maybe Exp -> EvalState Exp)
-expOperations = fromList [ ("extract", extractOp)
+expOperations = fromList [ ("concat", concatOp) 
+                         , ("extract", extractOp)
                          , ("replace", replaceOp)
                          , ("replaceAll", replaceAllOp)
-                         , ("union", replaceAllOp)
-                         , ("unify", replaceAllOp)
-                         , ("singleton", replaceAllOp)
-                         , ("sublanguage", replaceAllOp)
+                         , ("union", unionOp)
+                         , ("unify", unifyOp)
+                         , ("singleton", singletonOp)
+                         , ("subset", subsetOp)
                          ]
 stateOperations :: HashMap String (Maybe String -> HashMap String [Exp] -> EvalState Exp)
 stateOperations = fromList [ ("check", checkOp)

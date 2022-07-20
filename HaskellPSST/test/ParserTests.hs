@@ -11,6 +11,9 @@ parserTests = testGroup "Parser Tests" [parseStringToTree, parseExpTest, parseEr
 regexTestHelper :: String -> RegexTree -> TestTree
 regexTestHelper regexStr regexTree = testCase ("Parsing " ++ regexStr) (strSolParseR ("\"" ++ regexStr ++ "\"") @?= Right regexTree)
 
+-- regexParseTestHelper :: String -> RegexTree -> TestTree
+-- regexParseTestHelper regexStr regexTree
+
 parseStringToTree :: TestTree
 parseStringToTree = testGroup "Parse Regex String to Regex Tree"
   [ testGroup "Parsing Single Literal"
@@ -122,7 +125,7 @@ parseExpTest = testGroup "Parse Expression Tests"
       ]
       , testGroup "Parse String/Regex"
       [ testCase "Parse Epsilon"  (strSolParse "\"\"" @?= Right (ValExp (RegexVal False Epsilon)))
-      -- , testCase "Parse Single Literal"  (strSolParse "`a`" @?= Right (ValExp (RegexVal False "a")))
+      , testCase "Parse Single Literal"  (strSolParse "\"a\"" @?= Right (ValExp (RegexVal False $ Literal "a")))
       -- , testCase "Parse Sequence of Literal"  (strSolParse "`abc`" @?= Right (ValExp (RegexVal False "abc")))
       -- , testCase "Parse Simple Regex"  (strSolParse "`[abc]`" @?= Right (ValExp (RegexVal False "[abc]")))
       -- , testCase "Parse Complex Regex"  (strSolParse "`(a|b)*([^cd]?[efg])+`" @?= Right (ValExp (RegexVal "\\d+")))
@@ -141,7 +144,7 @@ parseExpTest = testGroup "Parse Expression Tests"
     ]
   , testGroup "Parse Assignment"
     [ testCase "Parse Assign Number" (strSolParse "x = 10" @?= Right (AssignmentExp "x" (ValExp (IntVal 10))))
-    , testCase "Parse Assign String" (strSolParse "x = `hello`" @?= Right (AssignmentExp "x" (ValExp (IntVal 10))))
+    , testCase "Parse Assign String" (strSolParse "x = \"abc\"" @?= Right (AssignmentExp "x" (ValExp (RegexVal False $ Sequence [Literal "a",Literal "b",Literal "c"]))))
     ]
   , testGroup "Parse Operators"
     []

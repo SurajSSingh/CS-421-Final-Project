@@ -65,7 +65,7 @@ data Val = IntVal Int
 instance Show Val where
     show (IntVal i) = show i
     show (ResultVal r) = r
-    show (RegexVal b r) = if b then "~" else "" ++ "<$0:(" ++ show r ++ ")>"
+    show (RegexVal b r) = (if b then "set-complement of " else "") ++ "<$0:(" ++ show r ++ ")>"
     show Void = show ""
 
 --- ### Expressions

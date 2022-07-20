@@ -9,12 +9,13 @@ import Control.Monad
 import qualified Data.Maybe
 import Data.List
 import Data.Char
+import PSST.RTOperations (isRegexSubLang)
 
 type Parser = ParsecT String () Identity
 
 --- ### Helper Info
 keywords :: [String]
-keywords = ["extract", "replace", "replaceAll", ":e", ":r", ":R", "clear", "check", "state", "solve", "unify", ":n", "subset", "singleton", "union", ":u"]
+keywords = ["extract", "replace", "replaceAll", ":e", ":r", ":R", "clear", "check", "state", "solve", "unify", ":n", "subset", ":s", "singleton", ":S",  "union", ":u"]
 digits :: [String]
 digits = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]
 
@@ -30,27 +31,45 @@ numberStringSpliter = aux []
 
 
 --- ### Helper Functions for Regex Tree building
+---     Allows these assumptions:
+---         1. Sequence will contain at least two items
+---         2. Repetition will apply only to the last item before it
+---         3. Epsilon will be removed, unless it's literally the only thing
+---         4. Binary choice will have two distinct items, with neither being subset of each other
 regexTreeSeqHelper :: [RegexTree] -> RegexTree
-regexTreeSeqHelper [] = Epsilon
+regexTreeSeqHelper [] = Epsilon -- Empty sequence is epsilon
 regexTreeSeqHelper [tree] = tree -- Return single item as itself (no sequence needed)
-regexTreeSeqHelper trees@(t:ts) = case t of 
-    Epsilon -> Sequence ts
-    _ -> Sequence trees
+regexTreeSeqHelper trees@(t:ts) = case t of
+    Epsilon -> regexTreeSeqHelper ts -- Remove epsilon, continue
+    _ -> case regexTreeSeqHelper ts of
+      EmptySet -> t
+      Epsilon -> t
+      Sequence rts -> Sequence (t:rts)
+      n -> Sequence [t, n]
 
 regexTreeRepHelper ::  Bool -> Int -> Maybe Int -> [RegexTree] -> [RegexTree]
-regexTreeRepHelper lazy start end [] = [Epsilon]
-regexTreeRepHelper lazy start end [tree] = [Repetition lazy start end tree]
-regexTreeRepHelper lazy start end (t:ts) = case t of 
-    Epsilon -> regexTreeRepHelper lazy start end ts
+regexTreeRepHelper lazy start end [] = [Epsilon] -- Repeat epsilon as many times as you want, it's still just epsilon
+regexTreeRepHelper lazy start end [tree] = [Repetition lazy start end tree] -- Last or only item, put repetition on it
+regexTreeRepHelper lazy start end (t:ts) = case t of
+    Epsilon -> regexTreeRepHelper lazy start end ts -- Remove epsilon, continue
     _ -> t : regexTreeRepHelper lazy start end ts
+
+regexTreeBinHelper :: RegexTree -> RegexTree -> RegexTree
+regexTreeBinHelper Epsilon t2 = Repetition False 0 (Just 1) t2 -- Make t2 optional
+regexTreeBinHelper t1 Epsilon = Repetition False 0 (Just 1) t1 -- Make t1 optional
+regexTreeBinHelper t1 t2 
+    | t2 `isRegexSubLang` t1 = t1                              -- t1 cover t2
+    | t1 `isRegexSubLang` t2 = t2                              -- t2 cover t1
+    | otherwise = BinChoice t1 t2
 
 regexTreeBuilder :: [String] -> RegexTree
 regexTreeBuilder strings = fst $ regexTreeBuilderAux strings [] 1
     where
         regexTreeBuilderAux :: [String] ->  [RegexTree] -> Int -> (RegexTree, (Int, [String]))
         regexTreeBuilderAux (c:cs) before num = case c of
-          "|" -> (BinChoice (regexTreeSeqHelper before) after, res)
+          "|" -> (regexTreeBinHelper simpleBefore after, res)
             where
+                simpleBefore = regexTreeSeqHelper before
                 (after, res) = regexTreeBuilderAux cs [] num
           "(" -> regexTreeBuilderAux nextCs (before ++ [group]) finalNum
             where
@@ -163,9 +182,9 @@ strP = do
     complement <- optionMaybe $ symbol "!" <|> symbol "~"
     r <- regex <?> "a regex string"
     case complement of
-      Nothing -> return $ ValExp $ RegexVal False r 
-      Just s -> return $ ValExp $ RegexVal True r 
-    
+      Nothing -> return $ ValExp $ RegexVal False r
+      Just s -> return $ ValExp $ RegexVal True r
+
 
 --- #### Read a variable name value
 varP :: ParsecT String () Identity Exp
@@ -182,9 +201,48 @@ assignmentP = try $ do
 concatOpP :: ParsecT String () Identity Exp
 concatOpP = try $ do
     exp1 <- varP <|> strP <?> "a variable or string"
-    symbol "+" <|> symbol "++"
+    maybeSpaceP
+    plus <- symbol "+"
+    maybeSpaceP
     exp2 <- concatOpP <|> varP <|> strP <?> "a variable or string or another concat operator"
+    maybeSpaceP
     return (OperatorExp "concat" exp1 (Just exp2) Nothing)
+
+unionOpP :: ParsecT String () Identity Exp
+unionOpP = try $ do
+    union <- symbol "union" <|> symbol ":u"
+    maybeSpaceP
+    exp1 <- strP <?> "a string"
+    maybeSpaceP
+    exp2 <- strP <|> unionOpP <?> "a string or another union operator"
+    maybeSpaceP
+    return (OperatorExp "union" exp1 (Just exp2) Nothing)
+
+unifyOpP :: ParsecT String () Identity Exp
+unifyOpP = try $ do
+    unify <- symbol "unify" <|> symbol ":n"
+    maybeSpaceP
+    exp1 <- strP <?> "a string"
+    maybeSpaceP
+    exp2 <- unifyOpP <|> strP <?> "a string or another unify operator"
+    maybeSpaceP
+    return (OperatorExp "unify" exp1 (Just exp2) Nothing)
+
+singletonOpP :: ParsecT String () Identity Exp
+singletonOpP = try $ do
+    unify <- symbol "single" <|> symbol ":S"
+    maybeSpaceP
+    exp1 <- strP <?> "a string"
+    maybeSpaceP
+    return (OperatorExp "singleton" exp1 Nothing Nothing)
+
+subsetOpP :: ParsecT String () Identity Exp
+subsetOpP = try $ do
+    unify <- symbol "subset" <|> symbol ":s"
+    maybeSpaceP
+    exp1 <- strP <?> "a string"
+    maybeSpaceP
+    return (OperatorExp "subset" exp1 Nothing Nothing)
 
 extractOpP :: ParsecT String () Identity Exp
 extractOpP = try $ do
@@ -242,6 +300,8 @@ stateOpP = try $ do
 simpleExprP :: Parser Exp
 simpleExprP = numP
             <|> assignmentP
+            <|> unionOpP
+            <|> unifyOpP
             <|> concatOpP
             <|> extractOpP
             <|> replaceOpP
