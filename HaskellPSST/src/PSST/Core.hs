@@ -104,21 +104,3 @@ instance Show Diagnostic where
 
 unimplemented :: String -> EvalState a
 unimplemented = throwError . UnimplementedError
-
-data S = S1 E Char S
-       | S2 Char E
-  deriving (Show,Eq)
-
-data E = E [Char] deriving (Show, Eq)
-parseE :: [Char] -> (E, [Char])
-parseE (x:xs) = (E [x], xs)
-
-parseS :: [Char] -> (S,[Char])
-parseS [] = undefined
-parseS e@(x:xs) = case x of 
-    'z' -> (S2 'z' zeRes, zeRem)
-    _ -> (S1 eyRes 'y' ysRes, ysRem)
-    where
-        (zeRes, zeRem) = (parseE xs)
-        (eyRes, eyRem) = (parseE e)
-        (ysRes, ysRem) = (parseS eyRem)
