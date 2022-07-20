@@ -16,95 +16,107 @@ escapedRegexSymbol = ["\\(", "\\)", "\\|", "\\?", "\\*", "\\+", "\\$", "\\."]
 type Env = H.HashMap String [Exp]
 type EvalState a = StateT Env (Except Diagnostic) a
 
-data AtLeastTwoList a = AtLeastTwoList {first2PValue :: a, second2PValue :: a, rest2PValue :: [a]}
 --- ### Regex Tree
---- Nodes: Empty, epsilon, (sigma - any char), exact string, numbered capture group, repetition (lazy or greedy) from M to N?
---- Adapted from Definition 3.1 of 
+--- Adapted from Definition 3.1
+--- Nodes (from least complex to most): 
+---   * Empty is not possible directly, only Nothing when Maybe Regex Tree
+---   * Single Literal: Either Bool (epsilon = False, sigma/any char = True) or String
+---   * Added Complement: Node accepts any string not accepted by enclosing node
+---   * Capture Group: Int (0 = full string, +N = capture number, -N = extract stub number)
+---   * Choice: Move down one node or the other, runs till it hits the enclosing capture group 
+---   * Sequence: Recursive connection of a sequence of nodes
+---   * Removed Repetition: Issue with infinite sets and whether lazy vs greedy semantics changes accepting language
 data RegexTree = EmptySet
-               | Epsilon
-               | AnyCharLiteral
-               | Literal String
+               | Literal (Either Bool String)
+               | Complement RegexTree
                | CaptureGroup Int RegexTree
-               | CaptureGroupStub (Maybe Int)
-               | Sequence [RegexTree]
-               | BinChoice RegexTree RegexTree
-               | Repetition Bool Int (Maybe Int) RegexTree
-               deriving ( Eq
-                        -- , Show
-                        )
+               | Choice RegexTree RegexTree
+               | Sequence RegexTree RegexTree
+               deriving ( Eq )
+
+epsilon :: Either Bool b
+epsilon = Left False
+anyCharacter :: Either Bool b
+anyCharacter = Left True
 
 instance Show RegexTree where
     show EmptySet = "{}"
-    show Epsilon = ""
-    show AnyCharLiteral = "."
-    show (Literal lit) = if lit `elem` requireEscapeRegexSymbol then "\\" ++ lit else lit
-    show (Sequence seq) =  concatMap show seq
-    show (BinChoice n1 n2) = show n1 ++ "|" ++ show n2
-    show (CaptureGroup num node) = "<$"++ show num ++ ":("++ show node ++ ")>"
-    show (CaptureGroupStub num) = case num of
-        Nothing ->"<$INVALID STUB$>" 
-        Just n -> "<$"++ show n ++ ">"
-    show (Repetition isLazy start end node) =
-        let
-        lazySym = if isLazy then "?" else ""
-        repeatSym = case (start, end) of
-            (0,Just 1) -> "?"
-            (0,Nothing) -> "*"
-            (1,Nothing) -> "+"
-            (s ,Nothing) -> "{" ++ show s ++ "}"
-            (s ,Just e) -> "{" ++ show s ++ "," ++ show e ++ "}"
-        in
-            show node ++ repeatSym ++ lazySym
+    show (Literal (Left b)) = if b then "." else ""
+    show (Literal (Right c)) = if c `elem` requireEscapeRegexSymbol then "\\" ++ c else c
+    show (CaptureGroup num t) = if num < 0 then "(<$" ++ show (-num) ++ ">)" else "<$" ++ show num ++ "(" ++ show t ++ ")>"
+    show (Sequence t ts) = show t ++ show ts
+    show (Choice t1 t2) = show t1 ++ "|" ++ show t2
+    show (Complement t1) = "~" ++ show t1
 
---- ### Helper Functions for Regex Tree building
----     Allows these assumptions:
----         1. Sequence will contain at least two items
----         2. Repetition will apply only to the last item before it
----         3. Epsilon will be removed, unless it's literally the only thing
----         4. Binary choice will have two distinct items, with neither being subset of each other
-regexTreeSeqHelper :: [RegexTree] -> RegexTree
-regexTreeSeqHelper [] = Epsilon -- Empty sequence is epsilon
-regexTreeSeqHelper [tree] = tree -- Return single item as itself (no sequence needed)
-regexTreeSeqHelper trees@(t:ts) = case t of
-    Epsilon -> regexTreeSeqHelper ts -- Remove epsilon, continue
-    _ -> case regexTreeSeqHelper ts of
-      EmptySet -> t
-      Epsilon -> t
-      Sequence rts -> Sequence (t:rts)
-      n -> Sequence [t, n]
+--- Convert a list of RegexTree into a Sequence
+listToRegexTree :: [RegexTree] -> RegexTree
+listToRegexTree [] = EmptySet
+listToRegexTree [t] = t
+listToRegexTree ((Literal epsilon):ts) = listToRegexTree ts
+listToRegexTree (t:ts) = Sequence t $ listToRegexTree ts
 
-regexTreeRepHelper ::  Bool -> Int -> Maybe Int -> [RegexTree] -> [RegexTree]
-regexTreeRepHelper lazy start end [] = [Epsilon] -- Repeat epsilon as many times as you want, it's still just epsilon
-regexTreeRepHelper lazy start end [tree] = [Repetition lazy start end tree] -- Last or only item, put repetition on it
-regexTreeRepHelper lazy start end (t:ts) = case t of
-    Epsilon -> regexTreeRepHelper lazy start end ts -- Remove epsilon, continue
-    _ -> t : regexTreeRepHelper lazy start end ts
+isSubtree :: RegexTree -> RegexTree -> Bool
+--- Equality between two trees always means subset
+isSubtree x y | x == y = True
+--- Empty Set is always a subset of any tree and never a subset of non empty trees
+isSubtree x EmptySet = False
+isSubtree EmptySet x = True
+--- Capture Group are transparent to subset
+--- Handles: */CaptureGroup (5)
+--- Handles: CaptureGroup/* (4)
+isSubtree x (CaptureGroup _ t) = not $ isSubtree x t
+isSubtree (CaptureGroup _ t) x = not $ isSubtree t x
+--- Handles: Complement/* (4) TODO
+--- Handles: */Complement (3) TODO
+isSubtree x (Complement t) = not $ isSubtree x t
+isSubtree (Complement t) x = False
+--- Handles: Literal/* (3)
+---          E in E
+---          A in A
+---          E not in A
+---          c in A
+---          c in C if c == C
+isSubtree (Literal x) (Literal y) = case (x, y) of
+    (Left xb, Left yb) -> xb == yb
+    (Left xb, Right ys) -> False
+    (Right xs, Left yb) -> yb
+    (Right xs, Right ys) -> xs == ys
+isSubtree x@(Literal _) (Choice a b) = isSubtree x a || isSubtree x b
+-- isSubtree x@(Literal _) (Sequence y Nothing) = x == y 
+isSubtree x@(Literal _) (Sequence y ys) = False
 
---- ### Values
-data Val = IntVal Int
-         | ResultVal String
-         | RegexVal Bool RegexTree
-         | Void
-         deriving (Eq)
+--- Handles: Choice/* (3)
+isSubtree (Choice a b) l@(Literal _) = isSubtree a l && isSubtree b l
+isSubtree (Choice a b) (Choice c d) = (isSubtree a c && isSubtree b d) || (isSubtree a d && isSubtree b c)
+-- isSubtree (Choice a b) (Sequence x Nothing) = isSubtree a x && isSubtree b x
+isSubtree (Choice a b) s@(Sequence x xs) = isSubtree a s || isSubtree b s
 
-instance Show Val where
-    show (IntVal i) = show i
-    show (ResultVal r) = r
-    show (RegexVal b r) = (if b then "set-complement of " else "") ++ "<$0:(" ++ show r ++ ")>"
-    show Void = show ""
+--- Handles: Sequence/* (3)
+-- isSubtree (Sequence x Nothing) l@(Literal _) = isSubtree x l
+isSubtree (Sequence x mx) l@(Literal _) = False
+-- isSubtree (Sequence x Nothing) (Choice a b) = isSubtree x a || isSubtree x b
+isSubtree (Sequence x mx) (Choice c d) = False
+-- isSubtree (Sequence x Nothing) (Sequence y Nothing) = isSubtree x y 
+-- isSubtree (Sequence x mx) (Sequence y Nothing) = False 
+-- isSubtree (Sequence x Nothing) (Sequence y ys) = False 
+isSubtree (Sequence x xs) (Sequence y ys) = False
+
 
 --- ### Expressions
-data Exp = ValExp Val
+data Exp = IntExp Int
+         | RegexExp RegexTree
          | VarExp String
+         | ResultValExp String
          | AssignmentExp String Exp
          | OperatorExp String Exp (Maybe Exp) (Maybe Exp)
-         | StateOpExp String (Maybe String)
+         | StateOpExp String (Maybe Exp)
          deriving (Eq)
 
-
 instance Show Exp where
-    show (ValExp v) = show v
+    show (IntExp i) = show i
+    show (RegexExp r) = show r
     show (VarExp v) = "var " ++ show v
+    show (ResultValExp res) = res
     show (AssignmentExp var exp) = "Set var " ++ show var ++ " to (" ++ show exp ++ ")"
     show (OperatorExp op e1 e2 e3) = "Op " ++ show op ++ " with (" ++ opArgs
         where
@@ -113,9 +125,9 @@ instance Show Exp where
                Just v2 -> " and " ++ show v2 ++ (case e3 of
                   Nothing -> ")"
                   Just v3 -> " and " ++ show v3 ++ ")"))
-    show (StateOpExp op var) = case var of
+    show (StateOpExp op exp) = case exp of
       Nothing -> "Running " ++ op ++ " on current environment"
-      Just s -> "Running " ++ op ++ " on var " ++ show s
+      Just s -> "Running " ++ op ++ " on " ++ show s
 
 data Diagnostic = UnimplementedError String
                 | InvalidOperationError String

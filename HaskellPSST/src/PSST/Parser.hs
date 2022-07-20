@@ -9,7 +9,7 @@ import Control.Monad
 import qualified Data.Maybe
 import Data.List
 import Data.Char
-import PSST.RTOperations (isRegexSubLang)
+import Data.Maybe (fromMaybe)
 
 type Parser = ParsecT String () Identity
 
@@ -30,53 +30,40 @@ numberStringSpliter = aux []
 
 
 regexTreeBinHelper :: RegexTree -> RegexTree -> RegexTree
-regexTreeBinHelper Epsilon t2 = Repetition False 0 (Just 1) t2 -- Make t2 optional
-regexTreeBinHelper t1 Epsilon = Repetition False 0 (Just 1) t1 -- Make t1 optional
 regexTreeBinHelper t1 t2 
-    | t2 `isRegexSubLang` t1 = t1                              -- t1 cover t2
-    | t1 `isRegexSubLang` t2 = t2                              -- t2 cover t1
-    | otherwise = BinChoice t1 t2
+    | t2 `isSubtree` t1 = t1                              -- t1 cover t2
+    | t1 `isSubtree` t2 = t2                              -- t2 cover t1
+    | otherwise = Choice t1 t2
 
 regexTreeBuilder :: [String] -> RegexTree
-regexTreeBuilder strings = fst $ regexTreeBuilderAux strings [] 1
+regexTreeBuilder strings = CaptureGroup 0 (fst $ regexTreeBuilderAux strings [] 1)
     where
         regexTreeBuilderAux :: [String] ->  [RegexTree] -> Int -> (RegexTree, (Int, [String]))
+        regexTreeBuilderAux [] before num = (listToRegexTree before, (num, []))
         regexTreeBuilderAux (c:cs) before num = case c of
-          "|" -> (regexTreeBinHelper simpleBefore after, res)
-            where
-                simpleBefore = regexTreeSeqHelper before
-                (after, res) = regexTreeBuilderAux cs [] num
-          "(" -> regexTreeBuilderAux nextCs (before ++ [group]) finalNum
-            where
-                res = regexTreeBuilderAux cs [] (num+1)
-                group = CaptureGroup num $ fst res
-                (finalNum, nextCs) = snd res
-          ")" -> (regexTreeSeqHelper before, (num, cs))
-          "?" -> regexTreeBuilderAux next rTree num
-            where
-                (rTree, next) = case cs of
-                    "?":n -> (regexTreeRepHelper True 0 (Just 1) before, n)
-                    _ -> (regexTreeRepHelper False 0 (Just 1) before , cs)
-          "+" -> regexTreeBuilderAux next rTree num
-            where
-                (rTree, next) = case cs of
-                    "?":n -> (regexTreeRepHelper True 1 Nothing before, n)
-                    _ -> (regexTreeRepHelper False 1 Nothing before , cs)
-          "*" -> regexTreeBuilderAux next rTree num
-            where
-                (rTree, next) = case cs of
-                    "?":n -> (regexTreeRepHelper True 0 Nothing before, n)
-                    _ -> (regexTreeRepHelper False 0 Nothing before , cs)
-          er | er `elem` escapedRegexSymbol   -> regexTreeBuilderAux cs (before ++ [Literal lr]) num
-            where
-              lr = Data.Maybe.fromMaybe er (stripPrefix "\\" er)
-          "." -> regexTreeBuilderAux cs (before ++ [AnyCharLiteral]) num
-          "$" -> regexTreeBuilderAux next (before ++ [cgStub]) num
-            where
-                (cgNum, next) =  numberStringSpliter cs
-                cgStub = CaptureGroupStub cgNum
-          c   -> regexTreeBuilderAux cs (before ++ [Literal c]) num
-        regexTreeBuilderAux [] before num = (regexTreeSeqHelper before, (num, []))
+            --- NOTE: Sequence are constructed at the end and Empty Set can never be constructed from strings
+            --- Complement
+            "~" -> regexTreeBuilderAux nextCs (before ++ [Complement rTree]) nextNum
+                where
+                    (rTree, (nextNum, nextCs)) = regexTreeBuilderAux cs [] num
+            --- Choice
+            "|" -> (regexTreeBinHelper updatedBefore updatedAfter, result)
+                where
+                    updatedBefore = listToRegexTree before
+                    (updatedAfter, result) = regexTreeBuilderAux cs [] num
+            --- CaptureGroup
+            "(" -> regexTreeBuilderAux nextCs (before ++ [CaptureGroup num rTree]) finalNum
+                where
+                    (rTree, (finalNum, nextCs)) = regexTreeBuilderAux cs [] (num+1)
+            ")" -> (listToRegexTree before, (num, cs))
+            "$" -> regexTreeBuilderAux nextCs (before ++ [CaptureGroup cgStubNum EmptySet]) num 
+                where
+                    (cgNum, nextCs) = numberStringSpliter cs
+                    cgStubNum = -(fromMaybe 0 cgNum)
+            --- Default: Literal
+            "" -> regexTreeBuilderAux cs (before ++ [Literal epsilon]) num
+            "." -> regexTreeBuilderAux cs (before ++ [Literal anyCharacter]) num
+            c -> regexTreeBuilderAux cs (before ++ [Literal $ Right c]) num
 
 --- ### Lexers
 --- #### Notes to self:
@@ -112,9 +99,6 @@ escapeQuote = do
     c <- oneOf "\\`"
     return [d, c]
 
-character :: Parser String
-character = fmap return (noneOf "\\`") <|> escapeQuote
-
 
 escape :: Parser String
 escape = do
@@ -122,7 +106,7 @@ escape = do
     c <- oneOf $
         ['\\','"','0','n','r','v','t','b','f'] -- all regular characters which can be escaped
         ++
-        ['(', ')', '|', '?', '*', '+', '$', '.'] -- all regex characters which can be escaped
+        ['(', ')', '|', '$', '.', '~', '?', '*', '+', '{', '}'] -- all regex characters which can be escaped
     return [d, c]
 
 nonEscape :: Parser Char
@@ -149,16 +133,17 @@ spaceP = many1 $ oneOf " \n\t"
 
 --- #### Read a number (integer) value
 numP :: ParsecT String () Identity Exp
-numP = ValExp . IntVal <$> int <?> "an integer"
+numP = IntExp <$> int <?> "an integer"
 
 --- #### Read a string (regex) value
 strP :: ParsecT String () Identity Exp
 strP = do
-    complement <- optionMaybe $ symbol "!" <|> symbol "~"
+    -- complement <- optionMaybe $ symbol "!" <|> symbol "~"
     r <- regex <?> "a regex string"
-    case complement of
-      Nothing -> return $ ValExp $ RegexVal False r
-      Just s -> return $ ValExp $ RegexVal True r
+    return $ RegexExp r
+    -- case complement of
+    --   Nothing -> return $ ValExp $ RegexVal False r
+    --   Just s -> return $ ValExp $ RegexVal True r
 
 
 --- #### Read a variable name value
@@ -170,7 +155,8 @@ assignmentP :: ParsecT String () Identity Exp
 assignmentP = try $ do
     var <- var <?> "a variable"
     symbol "="
-    AssignmentExp var <$> simpleExprP <?> "any simple expression"
+    val <- simpleExprP <?> "any simple expression"
+    return $ AssignmentExp var val
 
 
 concatOpP :: ParsecT String () Identity Exp
@@ -260,13 +246,13 @@ replaceAllOpP = try $ do
 clearOpP :: ParsecT String () Identity Exp
 clearOpP = try $ do
     clear <- symbol "clear"
-    variable <- optionMaybe var
+    variable <- optionMaybe varP
     return $ StateOpExp clear variable
 
 checkOpP :: ParsecT String () Identity Exp
 checkOpP = try $ do
     clear <- symbol "check" <|> symbol "solve"
-    variable <- optionMaybe var
+    variable <- optionMaybe varP
     return $ StateOpExp clear variable
 
 stateOpP :: ParsecT String () Identity Exp
@@ -276,7 +262,6 @@ stateOpP = try $ do
 
 simpleExprP :: Parser Exp
 simpleExprP = numP
-            <|> assignmentP
             <|> unionOpP
             <|> unifyOpP
             <|> concatOpP
@@ -293,6 +278,7 @@ rawExprP = checkOpP
        <|> stateOpP
        <|> subsetOpP
        <|> singletonOpP
+       <|> assignmentP
        <|> simpleExprP
        <?> "a value"
 
