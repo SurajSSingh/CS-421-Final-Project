@@ -9,7 +9,35 @@ maybeLTE (Just a) Nothing = True
 maybeLTE Nothing (Just b) = False
 maybeLTE (Just a) (Just b) = a <= b
 
+--- Update a capture group's number
+updateCaptureGroupNumber :: RegexTree -> Int -> (RegexTree, Int)
+updateCaptureGroupNumber (CaptureGroup cgNum t) num = (CaptureGroup num newt, newNum)
+  where
+    (newt, newNum) = updateCaptureGroupNumber t (num+1)
+updateCaptureGroupNumber (Sequence ts) num = (Sequence [], newNum)
+  where
+    (newSeq, newNum) = foldr aux ([], num) ts
+      where 
+        aux t acc = (ut : fst acc, nexNum)
+          where
+            (ut, nexNum) = updateCaptureGroupNumber t $ snd acc
+updateCaptureGroupNumber (BinChoice t1 t2) num = (BinChoice ut1 ut2, n2)
+  where
+    (ut1, n1) = updateCaptureGroupNumber t1 num
+    (ut2, n2) = updateCaptureGroupNumber t2 n1
+updateCaptureGroupNumber (Repetition l s me t) num = (Repetition l s me ut, newNum)
+  where
+    (ut, newNum) = updateCaptureGroupNumber t num
+updateCaptureGroupNumber t num = (t, num)
+
 --- ### Regex Tree pattern operations
+--- #### Regex Union: Combines two regex trees with binary choice and updating capture group numbers
+regexTreeUnion :: RegexTree -> RegexTree -> RegexTree
+regexTreeUnion t1 t2 = BinChoice (CaptureGroup 1 ut1) (CaptureGroup newNum ut2)
+  where
+    (ut1, newNum) = updateCaptureGroupNumber t1 2
+    (ut2, finNum) = updateCaptureGroupNumber t2 (newNum + 1) 
+
 --- #### Regex Unify: Return a regex tree that unifies two trees to their common pattern
 --- ####              , will be empty set if cannot be unified
 regexTreeUnify :: RegexTree -> RegexTree -> RegexTree
@@ -53,8 +81,14 @@ regexTreeUnify _ _ = EmptySet
 --- #### Is a given regex tree a subset of another regex tree
 ---      Recall that strings are sets in this language, e.g. "a" means {"a"}
 isRegexSubLang :: RegexTree -> RegexTree -> Bool
+--- Logically defined for sets
+isRegexSubLang EmptySet t = True
+isRegexSubLang t1 t2 | t1 == t2 = True
+--- Literal
 isRegexSubLang (Literal _) AnyCharLiteral = True
+--- BinChoice
 isRegexSubLang t (BinChoice t1 t2) = isRegexSubLang t t1 || isRegexSubLang t t2
+--- CaptureGroup
 isRegexSubLang t (CaptureGroup _ cg) = isRegexSubLang t cg
 --- Repetition
 isRegexSubLang (Repetition _ s1 me1 t1) (Repetition _ s2 me2 t2) = s2 <= s1 && maybeLTE me1 me2 && isRegexSubLang t1 t2
@@ -64,9 +98,7 @@ isRegexSubLang t1 (Repetition _ s2 me2 t2) = 0 < s2 && isRegexSubLang t1 t2
 --   [] -> False
 --   rt : rts -> 
 
---- Logically defined for sets
-isRegexSubLang EmptySet t = True
-isRegexSubLang t1 t2 | t1 == t2 = True
+
 isRegexSubLang _ _ = False
 
 --- #### Does a given regex tree contain only a single valid string 
@@ -80,7 +112,8 @@ isRegexSubLang _ _ = False
 isRegexSingleton :: RegexTree -> Bool
 isRegexSingleton Epsilon = True
 isRegexSingleton (Literal _) = True
-isRegexSingleton (Sequence [t]) = isRegexSingleton t
+isRegexSingleton (Sequence []) = False
+isRegexSingleton (Sequence ts) = all isRegexSingleton ts
 isRegexSingleton (CaptureGroup _ t) = isRegexSingleton t
 isRegexSingleton (BinChoice t1 t2) = t1 == t2 && isRegexSingleton t1
 isRegexSingleton (Repetition _ s me t) = case me of
