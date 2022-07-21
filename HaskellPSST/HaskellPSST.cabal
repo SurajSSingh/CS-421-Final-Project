@@ -32,7 +32,6 @@ library
       PSST.Runtime
   other-modules:
       Lib
-      PSST.Transducer
       Paths_HaskellPSST
   hs-source-dirs:
       src
