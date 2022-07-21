@@ -65,6 +65,7 @@ test-suite HaskellPSST-test
       EvalTests
       ParserTests
       RegexTests
+      TestHelpers
       Paths_HaskellPSST
   hs-source-dirs:
       test

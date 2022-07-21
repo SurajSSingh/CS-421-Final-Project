@@ -1,6 +1,48 @@
--- module PSST.RTOperations where
+module PSST.RTOperations where
 
--- import PSST.Core ( RegexTree(..) )
+import PSST.Core ( RegexTree(..), epsilon, anyCharacter, emptySet, isSubtree )
+
+
+--- #### Regex Tree Singleton: Does a given regex tree contain only a single valid string 
+---      These are:
+---       * Any Literal, except AnyCharLiteral, including Epsilon (i.e. {""})
+---       * A capture group that has a singleton
+---       * A complement that does NOT have a singleton
+---       * A sequence with one value that is itself a singleton, example: {"abc"}
+---       * A binary choice where both branches are the same and the branches are singleton
+---       * Repetition where the start and end match and the tree is a singleton itself
+---     All else are not singletons (either empty or multiple)
+isRegexSingleton :: RegexTree -> Bool
+-- isRegexSingleton EmptySet = False
+isRegexSingleton (Literal x)
+    | x == epsilon = True
+    | x == anyCharacter = False
+    | otherwise = True
+isRegexSingleton (CaptureGroup _ x) = isRegexSingleton x
+isRegexSingleton (Complement x) = not $ isRegexSingleton x
+isRegexSingleton (Sequence x y) = isRegexSingleton x && isRegexSingleton y
+isRegexSingleton (Choice x y)
+    | x == y = isRegexSingleton x && isRegexSingleton y
+    | otherwise = False
+
+
+--- #### Regex Tree Union: Take the set union of two regex trees.
+---                        At minimum, a union can occur by creating Choice on both trees
+regexUnion :: RegexTree -> RegexTree -> RegexTree
+regexUnion x y 
+    | x == y = x
+    | x `isSubtree` y = y
+    | y `isSubtree` x = x
+regexUnion x y = Choice x y
+--- #### Regex Tree Unify: Take the set intersection of two regex trees.
+---                        If no unification can occur, then return the empty set 
+---                        (should be the only place where an empty set can be introduced in the program)              
+regexUnify :: RegexTree -> RegexTree -> RegexTree
+regexUnify x y 
+    | x == y = y
+    | x `isSubtree` y = x
+    | y `isSubtree` x = y
+regexUnify x y = emptySet
 
 -- --- Nothing in this specific case means Infinity
 -- maybeLTE :: Maybe Int -> Maybe Int -> Bool
@@ -58,25 +100,7 @@
 --     (ut1, newNum) = updateCaptureGroupNumber t1 2
 --     (ut2, finNum) = updateCaptureGroupNumber t2 (newNum + 1)
 
--- --- #### Does a given regex tree contain only a single valid string 
--- ---      These are:
--- ---       * Any Literal, except AnyCharLiteral, including Epsilon (i.e. {""})
--- ---       * A sequence with one value that is itself a singleton, example: {"abc"}
--- ---       * A capture group that has a singleton
--- ---       * A binary choice where both branches are the same and the branches are singleton
--- ---       * Repetition where the start and end match and the tree is a singleton itself
--- ---     All else are not singletons (either empty or multiple)
--- isRegexSingleton :: RegexTree -> Bool
--- isRegexSingleton Epsilon = True
--- isRegexSingleton (Literal _) = True
--- isRegexSingleton (Sequence []) = False
--- isRegexSingleton (Sequence ts) = all isRegexSingleton ts
--- isRegexSingleton (CaptureGroup _ t) = isRegexSingleton t
--- isRegexSingleton (BinChoice t1 t2) = t1 == t2 && isRegexSingleton t1
--- isRegexSingleton (Repetition _ s me t) = case me of
---   Nothing -> False
---   Just e -> s == e && isRegexSingleton t
--- isRegexSingleton _ = False
+
 
 -- --- #### Is a given regex tree a subset of another regex tree
 -- ---      Recall that strings are sets in this language, e.g. "a" means {"a"}

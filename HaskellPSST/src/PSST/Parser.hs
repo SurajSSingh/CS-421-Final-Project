@@ -56,7 +56,7 @@ regexTreeBuilder strings = CaptureGroup 0 (fst $ regexTreeBuilderAux strings [] 
                 where
                     (rTree, (finalNum, nextCs)) = regexTreeBuilderAux cs [] (num+1)
             ")" -> (listToRegexTree before, (num, cs))
-            "$" -> regexTreeBuilderAux nextCs (before ++ [CaptureGroup cgStubNum EmptySet]) num 
+            "$" -> regexTreeBuilderAux nextCs (before ++ [CaptureGroup cgStubNum emptySet]) num 
                 where
                     (cgNum, nextCs) = numberStringSpliter cs
                     cgStubNum = -(fromMaybe 0 cgNum)

@@ -26,31 +26,39 @@ type EvalState a = StateT Env (Except Diagnostic) a
 ---   * Choice: Move down one node or the other, runs till it hits the enclosing capture group 
 ---   * Sequence: Recursive connection of a sequence of nodes
 ---   * Removed Repetition: Issue with infinite sets and whether lazy vs greedy semantics changes accepting language
-data RegexTree = EmptySet
-               | Literal (Either Bool String)
+data RegexTree = Literal (Either Bool String)
                | Complement RegexTree
                | CaptureGroup Int RegexTree
                | Choice RegexTree RegexTree
                | Sequence RegexTree RegexTree
+            --    | EmptySet
                deriving ( Eq )
 
+-- Special Regex Tree (for convience)
 epsilon :: Either Bool b
 epsilon = Left False
 anyCharacter :: Either Bool b
 anyCharacter = Left True
+-- Empty set equivalence proof: ~ ( {""} || ~({""}) ) --De Morgan's Law---> ~{""} && ~~{""} ---Double Negation--> ~{""} && {""} (Contradiction achieved)
+emptySet :: RegexTree
+emptySet = Complement (Choice (Literal epsilon) (Complement (Literal epsilon)))
+
+-- isEmptySet :: RegexTree -> Bool
+-- isEmptySet x | x == emptySet = True
+-- isEmptySet (Complement (Choice (x) Complement (y))) = True
 
 instance Show RegexTree where
-    show EmptySet = "{}"
     show (Literal (Left b)) = if b then "." else ""
     show (Literal (Right c)) = if c `elem` requireEscapeRegexSymbol then "\\" ++ c else c
     show (CaptureGroup num t) = if num < 0 then "(<$" ++ show (-num) ++ ">)" else "<$" ++ show num ++ "(" ++ show t ++ ")>"
     show (Sequence t ts) = show t ++ show ts
     show (Choice t1 t2) = show t1 ++ "|" ++ show t2
     show (Complement t1) = "~" ++ show t1
+    -- show EmptySet = "{}"
 
 --- Convert a list of RegexTree into a Sequence
 listToRegexTree :: [RegexTree] -> RegexTree
-listToRegexTree [] = EmptySet
+listToRegexTree [] = Literal epsilon -- Why epsilon over empty set? -> Empty Set accept no language, this in theory accept the empty string, which is epsilon
 listToRegexTree [t] = t
 listToRegexTree ((Literal epsilon):ts) = listToRegexTree ts
 listToRegexTree (t:ts) = Sequence t $ listToRegexTree ts
@@ -59,8 +67,8 @@ isSubtree :: RegexTree -> RegexTree -> Bool
 --- Equality between two trees always means subset
 isSubtree x y | x == y = True
 --- Empty Set is always a subset of any tree and never a subset of non empty trees
-isSubtree x EmptySet = False
-isSubtree EmptySet x = True
+-- isSubtree x EmptySet = False
+-- isSubtree EmptySet x = True
 --- Capture Group are transparent to subset
 --- Handles: */CaptureGroup (5)
 --- Handles: CaptureGroup/* (4)
