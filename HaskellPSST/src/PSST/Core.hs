@@ -31,7 +31,6 @@ data RegexTree = Literal (Either Bool String)
                | CaptureGroup Int RegexTree
                | Choice RegexTree RegexTree
                | Sequence RegexTree RegexTree
-            --    | EmptySet
                deriving ( Eq )
 
 -- Special Regex Tree (for convience)
