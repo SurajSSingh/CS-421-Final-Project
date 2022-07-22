@@ -32,37 +32,40 @@ data RegexNode = LiteralNode (Either Bool String)
                | ChoiceNode RegexNode RegexNode
                | RepetitionNode Bool Int (Maybe Int) RegexNode
                | CaptureGroupSequence Int RegexSequence
-               deriving ( Eq )
+               deriving ( Eq 
+               , Show
+               )
 
-instance Show RegexNode where
-    show (LiteralNode (Left False)) = "''"
-    show (LiteralNode (Left True)) = "."
-    show (LiteralNode (Right c)) = c
-    show (ComplementNode n) = "~" ++ show n
-    show (ChoiceNode a b) = show a ++ "|" ++ show b
-    show (RepetitionNode l s e n) = show n ++ rangeStr ++ isLazyStr
-        where
-            isLazyStr = if l then "?" else ""
-            rangeStr = case (s, e) of
-                (start, Just end)
-                    | end == 1     -> "?"
-                    | start == end -> "{" ++ show start ++ "}"
-                    | otherwise    -> "{" ++ show start ++ "," ++ show end ++ "}"
-                (0, Nothing)       -> "*"
-                (1, Nothing)       -> "+"
-                (start, Nothing)   -> "{" ++ show start ++ ",}"
-    show (CaptureGroupSequence num seq) = "(<$" ++ groupNum ++ ">" ++ seqStr ++ ")"
-        where
-            groupNum = show $ abs num
-            seqStr = intercalate "" (Prelude.map show seq)
+-- instance Show RegexNode where
+--     show (LiteralNode (Left False)) = "''"
+--     show (LiteralNode (Left True)) = "."
+--     show (LiteralNode (Right c)) = c
+--     show (ComplementNode n) = "~" ++ show n
+--     show (ChoiceNode a b) = show a ++ "|" ++ show b
+--     show (RepetitionNode l s e n) = show n ++ rangeStr ++ isLazyStr
+--         where
+--             isLazyStr = if l then "?" else ""
+--             rangeStr = case (s, e) of
+--                 (start, Just end)
+--                     | end == 1     -> "?"
+--                     | start == end -> "{" ++ show start ++ "}"
+--                     | otherwise    -> "{" ++ show start ++ "," ++ show end ++ "}"
+--                 (0, Nothing)       -> "*"
+--                 (1, Nothing)       -> "+"
+--                 (start, Nothing)   -> "{" ++ show start ++ ",}"
+--     show (CaptureGroupSequence num seq) = "<$" ++ groupNum ++ ">" ++ "(" ++ seqStr ++ ")"
+--         where
+--             groupNum = show $ abs num
+--             seqStr = intercalate "" (Prelude.map show seq)
 
---- Helper Regex Nodes
+--- ### Helper Regex Nodes
 epsilonNode :: RegexNode
 epsilonNode = LiteralNode $ Left False
 anyCharNode :: RegexNode
 anyCharNode = LiteralNode $ Left True
-specificCharNode :: String -> RegexNode
-specificCharNode c = LiteralNode $ Right c
+-- s = single or specific
+sCharNode :: String -> RegexNode
+sCharNode c = LiteralNode $ Right c
 kleeneStarNode :: Bool -> RegexNode -> RegexNode
 kleeneStarNode l = RepetitionNode l 0 Nothing
 kleenePlusNode :: Bool -> RegexNode -> RegexNode
@@ -84,6 +87,10 @@ data RegexTree = Literal (Either Bool String)
 --- Helper Functions
 renumberCaptureGroup :: Int -> RegexSequence -> (Int, RegexSequence)
 renumberCaptureGroup num [] = (num, [])
+renumberCaptureGroup num ((CaptureGroupSequence m cg):ns) | m < 0 = (finNum, (CaptureGroupSequence m newCg) : newNs)
+    where
+        (nextNum, newCg) = renumberCaptureGroup num cg
+        (finNum, newNs) = renumberCaptureGroup nextNum ns
 renumberCaptureGroup num ((CaptureGroupSequence m cg):ns) = (finNum, (CaptureGroupSequence num newCg) : newNs)
     where
         (nextNum, newCg) = renumberCaptureGroup (num+1) cg

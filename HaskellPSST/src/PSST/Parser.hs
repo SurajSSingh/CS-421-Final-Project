@@ -1,4 +1,4 @@
-module PSST.Parser (strSolParse, strSolParseR) where
+module PSST.Parser (strSolParse, strSolParseRegex) where
 import PSST.Core
 
 import Data.Functor.Identity
@@ -101,8 +101,12 @@ literalCharNodeParse = do
     litChar <- rCharacter
     case litChar of
         ""  -> return epsilonNode
-        "." -> return anyCharNode
-        c   -> return $ specificCharNode litChar
+        c   -> return $ sCharNode litChar
+
+anyCharNodeParse :: Parser RegexNode
+anyCharNodeParse = do
+    char '.'
+    return anyCharNode
 
 complementNodeParse :: Parser RegexNode
 complementNodeParse = do
@@ -111,26 +115,26 @@ complementNodeParse = do
     return $ ComplementNode n
 
 choiceNodeParse :: Parser RegexNode
-choiceNodeParse = do
-    a <- nodeParse <?> "a regex node"
+choiceNodeParse = try $ do
+    a <- forwardOnlyNodeParse <?> "a regex node"
     char '|' <?> "a choice symbol"
-    b <- nodeParse <?> "a regex node"
+    b <- forwardOnlyNodeParse <?> "a regex node"
     return $ ChoiceNode a b
 
 symbolRepetitionNodeParse :: Parser RegexNode
-symbolRepetitionNodeParse = do
-    n <- nodeParse <?> "a regex node"
+symbolRepetitionNodeParse = try $ do
+    n <- forwardOnlyNodeParse <?> "a regex node"
     r <- oneOf ['*', '+', '?'] <?> "a repeat symbol"
     l <- optionMaybe (char '?') <?> "an optional lazy symbol"
     case r of
         '*' -> return $ kleeneStarNode (isJust l) n
         '+' -> return $ kleenePlusNode (isJust l) n
         '?' -> return $ optionalNode (isJust l) n
-        -- _ -> ParseError
+        _ -> unexpected "unknown repeating character"
 
 curlyRepetitionNodeParse :: Parser RegexNode
-curlyRepetitionNodeParse = do
-    n <- nodeParse <?> "a regex node"
+curlyRepetitionNodeParse = try $ do
+    n <- forwardOnlyNodeParse <?> "a regex node"
     char '{' <?> "open curly repetition"
     x <- int <?> "a starting number"
     c <- optionMaybe $ char ','
@@ -140,9 +144,9 @@ curlyRepetitionNodeParse = do
     l <- optionMaybe (char '?') <?> "an optional lazy symbol"
     case c of
       -- Exact repetition
-      Nothing -> return $ RepetitionNode (isJust l) x (Just x) n 
+      Nothing -> return $ RepetitionNode (isJust l) x (Just x) n
       -- Bounded repetition
-      Just _ -> return $ RepetitionNode (isJust l) x y n 
+      Just _ -> return $ RepetitionNode (isJust l) x y n
 
 captureGroupParse :: Parser RegexNode
 captureGroupParse = do
@@ -154,25 +158,31 @@ captureGroupParse = do
 captureGroupStubParse :: Parser RegexNode
 captureGroupStubParse = do
     char '$'
-    n <- int
-    return $ CaptureGroupSequence (-n) []
+    captureGroupStub <$> int <?> "a number"
+
+forwardOnlyNodeParse :: Parser RegexNode
+forwardOnlyNodeParse = complementNodeParse
+                <|> captureGroupParse
+                <|> captureGroupStubParse
+                <|> anyCharNodeParse
+                <|> literalCharNodeParse
+                <?> "a valid non-choice regex node"
 
 nodeParse :: Parser RegexNode
-nodeParse = complementNodeParse
-          <|> choiceNodeParse
+nodeParse = choiceNodeParse
           <|> symbolRepetitionNodeParse
           <|> curlyRepetitionNodeParse
-          <|> captureGroupParse
-          <|> captureGroupStubParse
-          <|> literalCharNodeParse
-          <?> "a valid regex node" 
+          <|> forwardOnlyNodeParse
+          <?> "a valid regex node"
 
 regexStringParse :: Parser RegexNode
 regexStringParse = try $ do
-    char '"' <?> "OPEN QUOTE"
+    char '"' <?> "opening quote"
     nodes <- many nodeParse
-    char '"' <?> "CLOSE QUOTE"
-    return $ CaptureGroupSequence 0 $ snd $ renumberCaptureGroup 1 nodes
+    char '"' <?> "closing quote"
+    case nodes of
+      [] -> return $ CaptureGroupSequence 0 [epsilonNode]
+      _ -> return $ CaptureGroupSequence 0 $ snd $ renumberCaptureGroup 1 nodes
 
 
 -- Adapted from https://stackoverflow.com/questions/24106314/parser-for-quoted-string-using-parsec
@@ -365,5 +375,5 @@ exprP = between maybeSpaceP maybeSpaceP rawExprP <* eof
 strSolParse :: String -> Either ParseError Exp
 strSolParse = parse exprP "Error"
 
-strSolParseR :: String -> Either ParseError RegexNode
-strSolParseR = parse nodeParse "Error"
+strSolParseRegex :: String -> Either ParseError RegexNode
+strSolParseRegex = parse regexStringParse "Error"

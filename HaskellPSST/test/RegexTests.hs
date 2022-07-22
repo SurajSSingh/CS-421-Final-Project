@@ -1,8 +1,8 @@
--- module RegexTests (regexTreeTest) where
+module RegexTests (regexTreeTest) where
 -- import PSST.Core
 -- import PSST.RTOperations
--- import Test.Tasty (TestTree, testGroup)
--- import Test.Tasty.HUnit (testCase, (@?=))
+import Test.Tasty (TestTree, testGroup)
+import Test.Tasty.HUnit (testCase, (@?=))
 
 -- simpleLiteral = Literal "a"
 -- simpleSequence = Sequence [AnyCharLiteral, simpleLiteral]
@@ -12,8 +12,8 @@
 -- simplePlusRepetition tree = Repetition True 0 Nothing tree
 -- simpleOptRepetition tree = Repetition True 0 (Just 1) tree
 
--- regexTreeTest :: TestTree
--- regexTreeTest = testGroup "Regex Tree Operations Tests" [maybeLTETests, updateCaptureGroupNumberTests, regexTreeUnion, singletonTests, subLangTests, unifyTests]
+regexTreeTest :: TestTree
+regexTreeTest = testGroup "Regex Tree Operations Tests" []-- [maybeLTETests, updateCaptureGroupNumberTests, regexTreeUnion, singletonTests, subLangTests, unifyTests]
 
 -- maybeLTETests :: TestTree
 -- maybeLTETests = testGroup "Maybe Less Than or Equal To Tests" 

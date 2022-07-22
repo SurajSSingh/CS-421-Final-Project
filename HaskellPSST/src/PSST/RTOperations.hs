@@ -1,6 +1,6 @@
 module PSST.RTOperations where
 
-import PSST.Core ( RegexTree(..), epsilon, anyCharacter, emptySet, isSubtree )
+import PSST.Core ( RegexTree(..), RegexNode (..), epsilon, anyCharacter, emptySet, isSubtree, epsilonNode )
 
 
 --- #### Regex Tree Singleton: Does a given regex tree contain only a single valid string 
@@ -12,6 +12,23 @@ import PSST.Core ( RegexTree(..), epsilon, anyCharacter, emptySet, isSubtree )
 ---       * A binary choice where both branches are the same and the branches are singleton
 ---       * Repetition where the start and end match and the tree is a singleton itself
 ---     All else are not singletons (either empty or multiple)
+isNodeSingleton :: RegexNode -> Bool
+isNodeSingleton (LiteralNode n) 
+    | n == Left True = False
+    | otherwise = True
+isNodeSingleton (ComplementNode c) = not $ isNodeSingleton c
+isNodeSingleton (ChoiceNode a b) 
+    | a == b = isNodeSingleton a
+    | otherwise = False
+isNodeSingleton (RepetitionNode _ s (Just e) n) 
+    | s == e = isNodeSingleton n
+    | otherwise = False
+isNodeSingleton (RepetitionNode _ s Nothing n)
+    | n == epsilonNode = True
+    | otherwise = False
+isNodeSingleton (CaptureGroupSequence _ n) = all isNodeSingleton n
+
+
 isRegexSingleton :: RegexTree -> Bool
 -- isRegexSingleton EmptySet = False
 isRegexSingleton (Literal x)
