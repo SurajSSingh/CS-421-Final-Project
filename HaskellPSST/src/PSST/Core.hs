@@ -26,12 +26,84 @@ type EvalState a = StateT Env (Except Diagnostic) a
 ---   * Choice: Move down one node or the other, runs till it hits the enclosing capture group 
 ---   * Sequence: Recursive connection of a sequence of nodes
 ---   * Removed Repetition: Issue with infinite sets and whether lazy vs greedy semantics changes accepting language
+type RegexSequence = [RegexNode]
+data RegexNode = LiteralNode (Either Bool String)
+               | ComplementNode RegexNode
+               | ChoiceNode RegexNode RegexNode
+               | RepetitionNode Bool Int (Maybe Int) RegexNode
+               | CaptureGroupSequence Int RegexSequence
+               deriving ( Eq )
+
+instance Show RegexNode where
+    show (LiteralNode (Left False)) = "''"
+    show (LiteralNode (Left True)) = "."
+    show (LiteralNode (Right c)) = c
+    show (ComplementNode n) = "~" ++ show n
+    show (ChoiceNode a b) = show a ++ "|" ++ show b
+    show (RepetitionNode l s e n) = show n ++ rangeStr ++ isLazyStr
+        where
+            isLazyStr = if l then "?" else ""
+            rangeStr = case (s, e) of
+                (start, Just end)
+                    | end == 1     -> "?"
+                    | start == end -> "{" ++ show start ++ "}"
+                    | otherwise    -> "{" ++ show start ++ "," ++ show end ++ "}"
+                (0, Nothing)       -> "*"
+                (1, Nothing)       -> "+"
+                (start, Nothing)   -> "{" ++ show start ++ ",}"
+    show (CaptureGroupSequence num seq) = "(<$" ++ groupNum ++ ">" ++ seqStr ++ ")"
+        where
+            groupNum = show $ abs num
+            seqStr = intercalate "" (Prelude.map show seq)
+
+--- Helper Regex Nodes
+epsilonNode :: RegexNode
+epsilonNode = LiteralNode $ Left False
+anyCharNode :: RegexNode
+anyCharNode = LiteralNode $ Left True
+specificCharNode :: String -> RegexNode
+specificCharNode c = LiteralNode $ Right c
+kleeneStarNode :: Bool -> RegexNode -> RegexNode
+kleeneStarNode l = RepetitionNode l 0 Nothing
+kleenePlusNode :: Bool -> RegexNode -> RegexNode
+kleenePlusNode l = RepetitionNode l 1 Nothing
+optionalNode :: Bool -> RegexNode -> RegexNode
+optionalNode l = RepetitionNode l 0 (Just 1)
+captureGroupStub :: Int -> RegexNode
+captureGroupStub n = CaptureGroupSequence (-n) []
+emptySetNode :: RegexNode
+emptySetNode = CaptureGroupSequence 0 []
+
 data RegexTree = Literal (Either Bool String)
                | Complement RegexTree
                | CaptureGroup Int RegexTree
                | Choice RegexTree RegexTree
                | Sequence RegexTree RegexTree
                deriving ( Eq )
+
+--- Helper Functions
+renumberCaptureGroup :: Int -> RegexSequence -> (Int, RegexSequence)
+renumberCaptureGroup num [] = (num, [])
+renumberCaptureGroup num ((CaptureGroupSequence m cg):ns) = (finNum, (CaptureGroupSequence num newCg) : newNs)
+    where
+        (nextNum, newCg) = renumberCaptureGroup (num+1) cg
+        (finNum, newNs) = renumberCaptureGroup nextNum ns
+renumberCaptureGroup num ((ComplementNode n):ns) = (finNum, (ComplementNode newN) : newNs)
+    where
+        (nextNum, [newN]) = renumberCaptureGroup num [n]
+        (finNum, newNs) = renumberCaptureGroup nextNum ns
+renumberCaptureGroup num ((ChoiceNode a b):ns) = (finNum, (ChoiceNode newA newB) : newNs)
+    where
+        (nextNum1, [newA]) = renumberCaptureGroup num [a]
+        (nextNum2, [newB]) = renumberCaptureGroup nextNum1 [b]
+        (finNum, newNs) = renumberCaptureGroup nextNum2 ns
+renumberCaptureGroup num ((RepetitionNode l s e n):ns) = (finNum, (RepetitionNode l s e newN) : newNs)
+    where
+        (nextNum, [newN]) = renumberCaptureGroup num [n]
+        (finNum, newNs) = renumberCaptureGroup nextNum ns
+renumberCaptureGroup num (ln@(LiteralNode _):ns) = (finNum, ln : newNs)
+    where
+        (finNum, newNs) = renumberCaptureGroup num ns
 
 -- Special Regex Tree (for convience)
 epsilon :: Either Bool b
@@ -47,6 +119,7 @@ emptySet = Complement (Choice (Literal epsilon) (Complement (Literal epsilon)))
 -- isEmptySet (Complement (Choice (x) Complement (y))) = True
 
 instance Show RegexTree where
+    show (Complement (Choice a (Complement b))) | a == b = "***[[EMPTY SET]]*** => {}"
     show (Literal (Left b)) = if b then "." else ""
     show (Literal (Right c)) = if c `elem` requireEscapeRegexSymbol then "\\" ++ c else c
     show (CaptureGroup num t) = if num < 0 then "(<$" ++ show (-num) ++ ">)" else "<$" ++ show num ++ "(" ++ show t ++ ")>"

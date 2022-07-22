@@ -9,13 +9,15 @@ import Control.Monad
 import qualified Data.Maybe
 import Data.List
 import Data.Char
-import Data.Maybe (fromMaybe)
+import Data.Maybe (fromMaybe, isJust)
 
 type Parser = ParsecT String () Identity
 
 --- ### Helper Info
 keywords :: [String]
 keywords = ["extract", "replace", "replaceAll", ":e", ":r", ":R", "clear", "check", "state", "solve", "unify", ":n", "subset", ":s", "singleton", ":S",  "union", ":u"]
+regexSpecialSymbols :: [Char]
+regexSpecialSymbols = ['(', ')', '|', '$', '.', '~', '?', '*', '+', '{', '}']
 digits :: [String]
 digits = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]
 
@@ -30,7 +32,7 @@ numberStringSpliter = aux []
 
 
 regexTreeBinHelper :: RegexTree -> RegexTree -> RegexTree
-regexTreeBinHelper t1 t2 
+regexTreeBinHelper t1 t2
     | t2 `isSubtree` t1 = t1                              -- t1 cover t2
     | t1 `isSubtree` t2 = t2                              -- t2 cover t1
     | otherwise = Choice t1 t2
@@ -56,7 +58,7 @@ regexTreeBuilder strings = CaptureGroup 0 (fst $ regexTreeBuilderAux strings [] 
                 where
                     (rTree, (finalNum, nextCs)) = regexTreeBuilderAux cs [] (num+1)
             ")" -> (listToRegexTree before, (num, cs))
-            "$" -> regexTreeBuilderAux nextCs (before ++ [CaptureGroup cgStubNum emptySet]) num 
+            "$" -> regexTreeBuilderAux nextCs (before ++ [CaptureGroup cgStubNum emptySet]) num
                 where
                     (cgNum, nextCs) = numberStringSpliter cs
                     cgStubNum = -(fromMaybe 0 cgNum)
@@ -92,25 +94,99 @@ var = try $ do
     then fail ("got a keyword: " ++ show v ++ " in " ++ show keywords)
     else return v
 
+
+--- Regex Parse
+literalCharNodeParse :: Parser RegexNode
+literalCharNodeParse = do
+    litChar <- rCharacter
+    case litChar of
+        ""  -> return epsilonNode
+        "." -> return anyCharNode
+        c   -> return $ specificCharNode litChar
+
+complementNodeParse :: Parser RegexNode
+complementNodeParse = do
+    char '~'  <?> "a complement symbol"
+    n <- nodeParse <?> "a regex node"
+    return $ ComplementNode n
+
+choiceNodeParse :: Parser RegexNode
+choiceNodeParse = do
+    a <- nodeParse <?> "a regex node"
+    char '|' <?> "a choice symbol"
+    b <- nodeParse <?> "a regex node"
+    return $ ChoiceNode a b
+
+symbolRepetitionNodeParse :: Parser RegexNode
+symbolRepetitionNodeParse = do
+    n <- nodeParse <?> "a regex node"
+    r <- oneOf ['*', '+', '?'] <?> "a repeat symbol"
+    l <- optionMaybe (char '?') <?> "an optional lazy symbol"
+    case r of
+        '*' -> return $ kleeneStarNode (isJust l) n
+        '+' -> return $ kleenePlusNode (isJust l) n
+        '?' -> return $ optionalNode (isJust l) n
+        -- _ -> ParseError
+
+curlyRepetitionNodeParse :: Parser RegexNode
+curlyRepetitionNodeParse = do
+    n <- nodeParse <?> "a regex node"
+    char '{' <?> "open curly repetition"
+    x <- int <?> "a starting number"
+    c <- optionMaybe $ char ','
+    maybeSpaceP
+    y <- optionMaybe int <?> "an optional ending number"
+    char '}' <?> "close curly repetition"
+    l <- optionMaybe (char '?') <?> "an optional lazy symbol"
+    case c of
+      -- Exact repetition
+      Nothing -> return $ RepetitionNode (isJust l) x (Just x) n 
+      -- Bounded repetition
+      Just _ -> return $ RepetitionNode (isJust l) x y n 
+
+captureGroupParse :: Parser RegexNode
+captureGroupParse = do
+    char '('
+    n <- many1 nodeParse
+    char ')'
+    return $ CaptureGroupSequence 0 n
+
+captureGroupStubParse :: Parser RegexNode
+captureGroupStubParse = do
+    char '$'
+    n <- int
+    return $ CaptureGroupSequence (-n) []
+
+nodeParse :: Parser RegexNode
+nodeParse = complementNodeParse
+          <|> choiceNodeParse
+          <|> symbolRepetitionNodeParse
+          <|> curlyRepetitionNodeParse
+          <|> captureGroupParse
+          <|> captureGroupStubParse
+          <|> literalCharNodeParse
+          <?> "a valid regex node" 
+
+regexStringParse :: Parser RegexNode
+regexStringParse = try $ do
+    char '"' <?> "OPEN QUOTE"
+    nodes <- many nodeParse
+    char '"' <?> "CLOSE QUOTE"
+    return $ CaptureGroupSequence 0 $ snd $ renumberCaptureGroup 1 nodes
+
+
 -- Adapted from https://stackoverflow.com/questions/24106314/parser-for-quoted-string-using-parsec
-escapeQuote :: Parser String
-escapeQuote = do
-    d <- char '\\'
-    c <- oneOf "\\`"
-    return [d, c]
-
-
 escape :: Parser String
 escape = do
     d <- char '\\'
     c <- oneOf $
         ['\\','"','0','n','r','v','t','b','f'] -- all regular characters which can be escaped
         ++
-        ['(', ')', '|', '$', '.', '~', '?', '*', '+', '{', '}'] -- all regex characters which can be escaped
+        regexSpecialSymbols -- all regex characters which can be escaped
     return [d, c]
 
 nonEscape :: Parser Char
-nonEscape = noneOf ['\\','"','\0','\n','\r','\v','\t','\b','\f']
+nonEscape = noneOf $ ['\\','"','\0','\n','\r','\v','\t','\b','\f'] ++ regexSpecialSymbols
 
 rCharacter :: Parser String
 rCharacter = fmap return nonEscape <|> escape
@@ -289,5 +365,5 @@ exprP = between maybeSpaceP maybeSpaceP rawExprP <* eof
 strSolParse :: String -> Either ParseError Exp
 strSolParse = parse exprP "Error"
 
-strSolParseR :: String -> Either ParseError RegexTree
-strSolParseR = parse regex "Error"
+strSolParseR :: String -> Either ParseError RegexNode
+strSolParseR = parse nodeParse "Error"
