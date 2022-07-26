@@ -98,6 +98,12 @@ symbolRepetitionParseTest = testGroup "Symbol Repetition Nodes"
     , regexNodeTestCaseHelper "a+?" [RepetitionNode True 1 Nothing $ sCharNode "a"]
     , regexNodeTestCaseHelper "a?" [RepetitionNode False 0 (Just 1) $ sCharNode "a"]
     , regexNodeTestCaseHelper "a??" [RepetitionNode True 0 (Just 1) $ sCharNode "a"]
+    , regexNodeTestCaseHelper "(ab)*" [RepetitionNode False 0 Nothing $ CaptureGroupSequence 1 [sCharNode "a", sCharNode "b"]]
+    , regexNodeTestCaseHelper "(ab)*?" [RepetitionNode True 0 Nothing $ CaptureGroupSequence 1 [sCharNode "a", sCharNode "b"]]
+    , regexNodeTestCaseHelper "(ab)+" [RepetitionNode False 1 Nothing $ CaptureGroupSequence 1 [sCharNode "a", sCharNode "b"]]
+    , regexNodeTestCaseHelper "(ab)+?" [RepetitionNode True 1 Nothing $ CaptureGroupSequence 1 [sCharNode "a", sCharNode "b"]]
+    , regexNodeTestCaseHelper "(ab)?" [RepetitionNode False 0 (Just 1) $ CaptureGroupSequence 1 [sCharNode "a", sCharNode "b"]]
+    , regexNodeTestCaseHelper "(ab)??" [RepetitionNode True 0 (Just 1) $ CaptureGroupSequence 1 [sCharNode "a", sCharNode "b"]]
     ]
 -- regexTestHelper :: String -> RegexTree -> TestTree
 -- regexTestHelper regexStr regexTree = testCase ("Parsing " ++ regexStr) (strSolParseR ("\"" ++ regexStr ++ "\"") @?= Right regexTree)

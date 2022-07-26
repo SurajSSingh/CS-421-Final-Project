@@ -31,42 +31,6 @@ numberStringSpliter = aux []
         aux n c@(x:xs) = if x `elem` digits then aux (n ++ [x]) xs else (Just (read (intercalate "" n) :: Int), c)
 
 
-regexTreeBinHelper :: RegexTree -> RegexTree -> RegexTree
-regexTreeBinHelper t1 t2
-    | t2 `isSubtree` t1 = t1                              -- t1 cover t2
-    | t1 `isSubtree` t2 = t2                              -- t2 cover t1
-    | otherwise = Choice t1 t2
-
-regexTreeBuilder :: [String] -> RegexTree
-regexTreeBuilder strings = CaptureGroup 0 (fst $ regexTreeBuilderAux strings [] 1)
-    where
-        regexTreeBuilderAux :: [String] ->  [RegexTree] -> Int -> (RegexTree, (Int, [String]))
-        regexTreeBuilderAux [] before num = (listToRegexTree before, (num, []))
-        regexTreeBuilderAux (c:cs) before num = case c of
-            --- NOTE: Sequence are constructed at the end and Empty Set can never be constructed from strings
-            --- Complement
-            "~" -> regexTreeBuilderAux nextCs (before ++ [Complement rTree]) nextNum
-                where
-                    (rTree, (nextNum, nextCs)) = regexTreeBuilderAux cs [] num
-            --- Choice
-            "|" -> (regexTreeBinHelper updatedBefore updatedAfter, result)
-                where
-                    updatedBefore = listToRegexTree before
-                    (updatedAfter, result) = regexTreeBuilderAux cs [] num
-            --- CaptureGroup
-            "(" -> regexTreeBuilderAux nextCs (before ++ [CaptureGroup num rTree]) finalNum
-                where
-                    (rTree, (finalNum, nextCs)) = regexTreeBuilderAux cs [] (num+1)
-            ")" -> (listToRegexTree before, (num, cs))
-            "$" -> regexTreeBuilderAux nextCs (before ++ [CaptureGroup cgStubNum emptySet]) num
-                where
-                    (cgNum, nextCs) = numberStringSpliter cs
-                    cgStubNum = -(fromMaybe 0 cgNum)
-            --- Default: Literal
-            "" -> regexTreeBuilderAux cs (before ++ [Literal epsilon]) num
-            "." -> regexTreeBuilderAux cs (before ++ [Literal anyCharacter]) num
-            c -> regexTreeBuilderAux cs (before ++ [Literal $ Right c]) num
-
 --- ### Lexers
 --- #### Notes to self:
 ---     * spaces = 0 or more spaces
@@ -181,8 +145,8 @@ regexStringParse = try $ do
     nodes <- many nodeParse
     char '"' <?> "closing quote"
     case nodes of
-      [] -> return $ CaptureGroupSequence 0 [epsilonNode]
-      _ -> return $ CaptureGroupSequence 0 $ snd $ renumberCaptureGroup 1 nodes
+      [] -> return $ wrapNodeInCaptureGroup [epsilonNode]
+      _ -> return $ wrapNodeInCaptureGroup nodes
 
 
 -- Adapted from https://stackoverflow.com/questions/24106314/parser-for-quoted-string-using-parsec
@@ -201,12 +165,12 @@ nonEscape = noneOf $ ['\\','"','\0','\n','\r','\v','\t','\b','\f'] ++ regexSpeci
 rCharacter :: Parser String
 rCharacter = fmap return nonEscape <|> escape
 
-regex :: Parser RegexTree
-regex = try $ do
-    char '"' <?> "OPEN QUOTE"
-    strings <- many rCharacter
-    char '"' <?> "CLOSE QUOTE"
-    return $ regexTreeBuilder strings
+-- regex :: Parser RegexNode
+-- regex = try $ do
+--     char '"' <?> "OPEN QUOTE"
+--     strings <- many rCharacter
+--     char '"' <?> "CLOSE QUOTE"
+--     return $ regexTreeBuilder strings
 
 maybeSpaceP :: Parser String
 maybeSpaceP = many $ oneOf " \n\t"
@@ -225,7 +189,7 @@ numP = IntExp <$> int <?> "an integer"
 strP :: ParsecT String () Identity Exp
 strP = do
     -- complement <- optionMaybe $ symbol "!" <|> symbol "~"
-    r <- regex <?> "a regex string"
+    r <- regexStringParse <?> "a regex string"
     return $ RegexExp r
     -- case complement of
     --   Nothing -> return $ ValExp $ RegexVal False r

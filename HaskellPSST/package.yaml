@@ -31,6 +31,7 @@ library:
   - PSST.Core
   - PSST.Parser
   - PSST.RTOperations
+  - PSST.RTCalculus
   - PSST.Evaluator
   - PSST.Runtime
 
