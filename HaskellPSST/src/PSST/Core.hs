@@ -115,6 +115,7 @@ isSubNode (LiteralNode a) (LiteralNode b)
     | a == Left True && b /= Left False = True
     | a /= Left False && b == Left True = True
 isSubNode n (ChoiceNode a b) = n `isSubNode` a || n `isSubNode` b
+isSubNode (ChoiceNode a b) n = a `isSubNode` n && b `isSubNode` n
 isSubNode n (ComplementNode c) = not $ n `isSubNode` c
 isSubNode (RepetitionNode _ s1 me1 r1) (RepetitionNode _ s2 me2 r2)
     | s2 <= s1 && me1 `maybeLTE` me2 = r1 `isSubNode` r2
@@ -124,6 +125,7 @@ isSubNode n (RepetitionNode _ s (Just e) r)
 isSubNode n (RepetitionNode _ s Nothing r)
     | s < 2 = n `isSubNode` r
 isSubNode n (CaptureGroupSequence _ []) = isEmpty n
+isSubNode (CaptureGroupSequence _ []) n = True
 isSubNode n (CaptureGroupSequence _ [s]) = n `isSubNode` s
 isSubNode _ _ = False
 
@@ -142,7 +144,7 @@ anyCharNode :: RegexNode
 anyCharNode = LiteralNode $ Left True
 everyThingNode :: RegexNode
 everyThingNode = RepetitionNode False 0 Nothing anyCharNode
--- s = single or specific
+-- #### s = single or specific
 sCharNode :: String -> RegexNode
 sCharNode c = LiteralNode $ Right c
 kleeneStarNode :: Bool -> RegexNode -> RegexNode

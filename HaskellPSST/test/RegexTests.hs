@@ -7,14 +7,6 @@ import qualified Text.Parsec as Text.Parsec.Error
 import PSST.Core (RegexNode (CaptureGroupSequence), emptySetNode)
 import PSST.RTOperations (isNodeSingleton, regexUnify, regexUnion)
 
--- simpleLiteral = Literal "a"
--- simpleSequence = Sequence [AnyCharLiteral, simpleLiteral]
--- simpleCaptureGroup tree = CaptureGroup 0 tree
--- simpleCaptureGroupStub = CaptureGroupStub Nothing
--- simpleStarRepetition tree = Repetition True 0 Nothing tree
--- simplePlusRepetition tree = Repetition True 0 Nothing tree
--- simpleOptRepetition tree = Repetition True 0 (Just 1) tree
-
 regexNodeGenerator :: String -> RegexNode
 regexNodeGenerator regexStr = case strSolParseRegex ("\"" ++ regexStr ++ "\"") of
   Left pe -> CaptureGroupSequence 0 []

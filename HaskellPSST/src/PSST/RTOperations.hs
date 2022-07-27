@@ -34,12 +34,13 @@ isNodeSingleton (CaptureGroupSequence _ n) = all isNodeSingleton n
 --- ## Regex Node Union: Take the set union of two regex trees.
 ---                      At minimum, a union can occur by creating Choice on both trees
 regexUnion :: RegexNode -> RegexNode -> RegexNode
---- ### Equality or subnode can just use one or the other
+--- ### Equality or subnode can just use larger of two
+--- #### Includes Special Case: Empty Set -> return node
 regexUnion x y
-    | x == y = x
+    | x == y = y
     | x `isSubNode` y = y
     | y `isSubNode` x = x
---- *** No need to check for equality or subnodes below ***
+--- *** Every Node below is non-equal, non-subsets, non-empty ***
 --- ### Literal | Literal
 --- #### AnyChar | Epsilon -> optional any char
 regexUnion (LiteralNode (Left False)) (LiteralNode (Left True)) = optionalNode False anyCharNode
@@ -80,72 +81,143 @@ regexUnion (ComplementNode c) x | x == c = everyThingNode
 --- ### DEFAULT: a b = ChoiceNode a b
 regexUnion x y = ChoiceNode x y
 
---- #### Regex Node Unify: Take the set intersection of two regex trees.
----                        If no unification can occur, then return the empty set 
----                        (one of the places where an empty set can be introduced in the program)              
+--- ## Regex Node Unify: Take the set intersection of two regex trees.
+---                      If no unification can occur, then return the empty set 
+---                      (one of the places where an empty set can be introduced in the program)              
 regexUnify :: RegexNode -> RegexNode -> RegexNode
---- Equality or subnode can just use one or the other
+--- ### Equality or subnode can just use smaller for two
+--- #### Includes Special Case: Empty Set -> return empty set
 regexUnify x y
-    | x == y = y
+    | x == y = x
     | x `isSubNode` y = x
     | y `isSubNode` x = y
---- Everything below is non-equal, non-subsets
---- Literal & Literal (9)
-regexUnify (LiteralNode (Left False)) (LiteralNode (Left False)) = epsilonNode
-regexUnify (LiteralNode (Left True)) (LiteralNode (Left True)) = anyCharNode
-regexUnify (LiteralNode (Left False)) (LiteralNode (Left True)) = optionalNode False anyCharNode
-regexUnify (LiteralNode (Left True)) (LiteralNode (Left False)) = optionalNode False anyCharNode
-regexUnify (LiteralNode (Left False)) ln@(LiteralNode (Right _)) = optionalNode False ln
-regexUnify ln@(LiteralNode (Right _)) (LiteralNode (Left False)) = optionalNode False ln
-regexUnify (LiteralNode (Left True)) ln@(LiteralNode (Right _)) = ln
-regexUnify ln@(LiteralNode (Right _)) (LiteralNode (Left True)) = ln
-regexUnify l1@(LiteralNode (Right x)) l2@(LiteralNode (Right y))
-    | x == y = l1
-    | otherwise = emptySet
+--- *** Every Node below is non-equal, non-subsets, non-empty ***
+--- ### Literal & Literal
+--- #### Epsilon & AnyChar -> empty set (any char is only non-empty character)
+--- #### Epsilon & LitChar -> empty set
+--- #### LitChar & AnyChar -> char
+regexUnify (LiteralNode (Left True)) ln@(LiteralNode (Right c)) = ln
+regexUnify ln@(LiteralNode (Right c)) (LiteralNode (Left True)) = ln
+--- ### Literal & Choice
+--- #### Epsilon & Choice -> empty set
+--- #### AnyChar & Choice -> 
+--- #### LitChar & Choice -> empty set
+--- ### Literal & Repeat
+--- #### Epsilon & Repeat{0,} -> epsilon
+--- #### Epsilon & Repeat{1+,} -> empty set
+--- #### AnyChar & Repeat
+--- #### LitChar & Repeat -> empty set
+--- ### Literal & Group
+--- #### Epsilon & Group -> empty set
+--- #### AnyChar & Group -> 
+--- #### LitChar & Group -> empty set
 
--- regexUnify (LiteralNode (Left False)) (ComplementNode c) = emptySet
--- regexUnify (ComplementNode c) (LiteralNode (Left False)) = emptySet
--- regexUnify (LiteralNode (Left True)) (ComplementNode c) = emptySet
--- regexUnify (ComplementNode c) (LiteralNode (Left True)) = emptySet
--- regexUnify (LiteralNode (Right x)) (ComplementNode c) = emptySet
--- regexUnify (ComplementNode c) (LiteralNode (Right y)) = emptySet
---- Literal & Choice 
-regexUnify (LiteralNode (Left False)) (ChoiceNode a b) = emptySet
-regexUnify (ChoiceNode a b) (LiteralNode (Left False)) = emptySet
-regexUnify (LiteralNode (Left True)) (ChoiceNode a b) = emptySet
-regexUnify (ChoiceNode a b) (LiteralNode (Left True)) = emptySet
-regexUnify (LiteralNode (Right x)) (ChoiceNode a b) = emptySet
-regexUnify (ChoiceNode a b) (LiteralNode (Right y)) = emptySet
---- Literal & Repetition
-regexUnify (LiteralNode (Left False)) x = emptySet
-regexUnify x (LiteralNode (Left False)) = emptySet
-regexUnify (LiteralNode (Left True)) x = emptySet
-regexUnify x (LiteralNode (Left True)) = emptySet
-regexUnify (LiteralNode (Right x)) c = emptySet
-regexUnify x (LiteralNode (Right y)) = emptySet
---- Literal & Group
-regexUnify (LiteralNode (Left False)) x = emptySet
-regexUnify x (LiteralNode (Left False)) = emptySet
-regexUnify (LiteralNode (Left True)) x = emptySet
-regexUnify x (LiteralNode (Left True)) = emptySet
-regexUnify (LiteralNode (Right x)) c = emptySet
-regexUnify x (LiteralNode (Right y)) = emptySet
---- 
-regexUnify a b = emptySet
-regexUnify a b = emptySet
-regexUnify a b = emptySet
-regexUnify a b = emptySet
-regexUnify a b = emptySet
-regexUnify a b = emptySet
-regexUnify a b = emptySet
-regexUnify a b = emptySet
-regexUnify a b = emptySet
---- 
-regexUnify (LiteralNode (Left True)) (LiteralNode (Right c)) = LiteralNode (Right c)
-regexUnify (LiteralNode (Right c)) (LiteralNode (Left True)) = LiteralNode (Right c)
+--- ### Choice & Choice 
+--- #### (single match) a|b & c|b -> b
+--- #### *** double match is equality ***
+--- #### (no match) a|b & c|d -> empty set
+regexUnify (ChoiceNode a b) (ChoiceNode c d)
+    | a == c = a
+    | a == d = a
+    | b == c = b
+    | b == d = b
+    | otherwise = emptySet
+--- ### Choice & Repeat (use distribution)
+--- #### (repeat at most once) a|b & a{s,(x>1)} -> a&a{s,(x>1)} | b&a{s,(x>1)}
+regexUnify (ChoiceNode a b) (RepetitionNode l s (Just e) n)
+    | s <= 1 && e >= 1 = regexUnion (regexUnify a n) (regexUnify b n)
+regexUnify (RepetitionNode l s (Just e) n) (ChoiceNode a b)
+    | s <= 1 && e >= 1 = regexUnion (regexUnify a n) (regexUnify b n)
+--- #### (repeat at least once) a|b & a{1,e?} -> a&a{1,e?} | b&a{1,e?}
+regexUnify (ChoiceNode a b) (RepetitionNode l s Nothing n)
+    | s <= 1 = regexUnion (regexUnify a n) (regexUnify b n)
+regexUnify (RepetitionNode l s Nothing n) (ChoiceNode a b)
+    | s <= 1 = regexUnion (regexUnify a n) (regexUnify b n)
+--- ### Choice & Group -> empty set
+
+--- ### Repeat & Repeat 
+--- #### (overlapping, but not strict subset) -> repeat with (either lazy) (max start) (min end) (subset of node1 and node2)
 regexUnify (RepetitionNode l1 s1 e1 n1) (RepetitionNode l2 s2 e2 n2)
     | n1 == n2 = RepetitionNode (l1 || l2) (max s1 s2) (maybeMin e1 e2) n1
---- [] & Complement - all empty since if node were subnode, it would have succeeded earlier 
+    | n1 `isSubNode` n2 = RepetitionNode (l1 || l2) (max s1 s2) (maybeMin e1 e2) n1
+    | n2 `isSubNode` n1 = RepetitionNode (l1 || l2) (max s1 s2) (maybeMin e1 e2) n2
+--- #### otherwise -> empty set
+--- ### Repeat & Group -> empty set
+
+--- ### Group & Group -> empty set
+
+--- ### Any with Complement not (direct) subgroup
+--- ### Note 1: Inner set = C which becomes complemented (~C)
+--- ### Note 2: c in C
+--- ### Literal & Complement 
+--- #### Epsilon & Complement
+--- #### Epsilon in C -> empty set
+--- #### Epsilon not in C -> Epsilon
+regexUnify (ComplementNode c) ln@(LiteralNode (Left False))
+    | ln `isSubNode` c = emptySet
+    | otherwise = epsilonNode
+regexUnify ln@(LiteralNode (Left False)) (ComplementNode c)
+    | ln `isSubNode` c = emptySet
+    | otherwise = epsilonNode
+--- #### AnyChar & Complement 
+--- #### AnyChar in C -> empty set
+--- #### AnyChar not in C -> AnyChar
+regexUnify (ComplementNode c) ln@(LiteralNode (Left True))
+    | ln `isSubNode` c = emptySet
+    | otherwise = anyCharNode
+regexUnify ln@(LiteralNode (Left True)) (ComplementNode c)
+    | ln `isSubNode` c = emptySet
+    | otherwise = anyCharNode
+--- #### LitChar & Complement 
+--- #### LitChar in C -> empty set
+--- #### LitChar not in C -> LitChar
+regexUnify (ComplementNode c) ln@(LiteralNode (Right l))
+    | ln `isSubNode` c = emptySet
+    | otherwise = ln
+regexUnify ln@(LiteralNode (Right l)) (ComplementNode c)
+    | ln `isSubNode` c = emptySet
+    | otherwise = ln
+--- ### Choice & Complement 
+--- #### both a and b in C -> empty set
+--- #### a in C -> b
+--- #### b in C -> a
+--- #### both a and b not in C -> a|b
+regexUnify (ComplementNode c) ch@(ChoiceNode a b)
+    | a `isSubNode` c && b `isSubNode` c = emptySet
+    | a `isSubNode` c = b
+    | b `isSubNode` c = a
+    | otherwise = ch
+regexUnify ch@(ChoiceNode a b) (ComplementNode c)
+    | a `isSubNode` c && b `isSubNode` c = emptySet
+    | a `isSubNode` c = b
+    | b `isSubNode` c = a
+    | otherwise = ch
+--- ### Repeat & Complement
+--- #### c == epsilon -> repeat with at least once
+--- #### r in C -> empty set
+--- #### c in R -> R\c
+--- #### c not in R and r not in C -> r
+regexUnify (ComplementNode c) rn@(RepetitionNode l s me r)
+    | c == epsilonNode = RepetitionNode l (max 1 s) me r
+    | r `isSubNode` c = emptySet
+    | c `isSubNode` rn = regexUnion epsilonNode (RepetitionNode l (max 2 s) me r)
+    | otherwise = rn
+regexUnify rn@(RepetitionNode l s me r) (ComplementNode c)
+    | c == epsilonNode = RepetitionNode l (max 1 s) me r
+    | r `isSubNode` c = emptySet
+    | c `isSubNode` rn = regexUnion epsilonNode (RepetitionNode l (max 2 s) me r)
+    | otherwise = rn
+--- ### Group & Complement 
+--- #### g in C -> empty set
+--- #### g not in C -> g
+regexUnify (ComplementNode c) cgs@(CaptureGroupSequence _ g)
+    | cgs `isSubNode` c = emptySet
+    | otherwise = cgs
+regexUnify cgs@(CaptureGroupSequence _ g) (ComplementNode c)
+    | cgs `isSubNode` c = emptySet
+    | otherwise = cgs
+
+--- ### DEFAULT: empty set
 regexUnify x y = emptySet
 
 
