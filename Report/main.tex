@@ -17,6 +17,7 @@
 \usepackage{csquotes}
 \usepackage{microtype}
 \usepackage[ragged]{footmisc}
+\usepackage{listings}
 
 \title{CS 421: Final Report}
 \author{Suraj Singh \\ NetId: surajss2 }
@@ -25,15 +26,71 @@
 
 \maketitle
 
+
 \section{Overview}\label{sec:overview}
 %%% Describe the motivation, goals, and broad accomplishments of your project in general terms.
+\subsection{Motivation}\label{sec:motivation}
+My primary motivation was to start creating a programming language that can treat Regex strings like types.
+Regular expressions provide a compact way of representing a set (which potentially could be infinite) of accepting string.
+In theory, these accepted strings could be thought of as possible values for a variable, much like types.
+The key idea this affords us is that we might be able to use regex values to hold properties about some variable.
+While, obviously, I could not implement the whole language within a month, I could at least focus this project on trying to get the Regex strings and operations working.
+
+\subsection{Goals}\label{sec:goals}
+My goal was to create a programming language that can store and operate on regex values.
+
+This required adding . 
+The idea from the original paper posited the idea of 
+
+While my initial proposal 
+
+\subsection{Broad Accomplishments}\label{sec:accomplications}
+I was able to complete the general REPL of the language, add a mechanism for assigning variables to regex strings and other variables, and added some functions to process regex string such as getting the union and intersection. 
+
+
 \section{Implementation}\label{sec:impl}
 %%%A brief description of the important aspects of your implementation, in  terms of (a) the major tasks or capabilities of your code; (b)  components of the code; (d) status of the project – what works well,  what works partially, and and what is not implemented at all. You MUST  compare these with your original proposed goals in the project proposal.
+
+\subsection{Capabilities}\label{sec:capabilities}
+
+\subsection{Components}\label{sec:components}
+There are 5 main modules created for this project, which are:
+\begin{enumerate}
+    \item Core: Holds the primary data structure, type aliases, and generally used helper functions for the program
+    \item RTOperations: Holds specific operations on the Regex Tree Node, such as determining if a pattern is a singleton and returning the union of two patterns.
+    \item Parser: Provides the mechanism for parsing string into Expression
+    \item Evaluator: Processes the expression and evaluates the result
+    \item Runtime: Handles the read, print, and loop section of the REPL
+\end{enumerate}
+
+\subsection{What Works Well}\label{sec:working}
+The REPL system works well.
+
+I also feel good about the Regex Node data type I implemented for storing regex values.
+
+\subsection{What Works Partially}\label{sec:partially}
+The Parser to Regex Node works correctly, though the semantics is very different from other regex implementations.
+It technically should be able to represent any regex string, but at the current cost of require lots of explicit parentheses.
+Every operator I have implemented for the regex syntax (such as `*', `+', `?', `|', etc.) is tried one at a time and parses only a single character around the operator.
+For example, when I provide the regex `ax|by', this gets translated as the set {`axy', `aby'} instead of {`ax', `by'} since the choice operator only check the preceding and next node.
+To get the set {`ax', `by'}, one would have to do `(ax)|(by)', which parses the inner capture groups first, and then the choice.
+This also means a regex like `a?|b*' would fail to parse, since the `|' would look at `?' and `b', which doesn't make sense for my current parser.
+To get the appropriate mean, one would have to add parentheses like so: `(a?)|(b*)'.
+With more time, I would have looked into Parsec's `Expr' module for better parsing.
+
+\subsection{What's Not Implemented}\label{sec:not_impl}
+
+I could not finish the \lstinline{extract}, \lstinline{replace}, and \lstinline{replaceAll} functions. 
+These functions primarily .
+
+I also ran out of time to implement the actual solver calculus from paper.
+
+
 \section{Tests}\label{sec:tests}
 %%% Coming up with appropriate tests is one of the most important part of  good software development. Your tests should include unit tests, feature  tests, and larger test codes. Give a short description of the tests  used, performance results if appropriate (e.g., memory consumption for  garbage collection) etc. Be sure to explain how these tests exercise the  concept(s) you've implemented.
 
 
 \section{Listing}\label{sec:code}
-%%% Coming up with appropriate tests is one of the most important part of  good software development. Your tests should include unit tests, feature  tests, and larger test codes. Give a short description of the tests  used, performance results if appropriate (e.g., memory consumption for  garbage collection) etc. Be sure to explain how these tests exercise the  concept(s) you've implemented.
+%%%  A listing of your code. The code should be documented thoroughly and  clearly. You don't need to comment every single line or even every  single function. Instead, focus on the central functions and data  structures in your implementation, and document them well.
 
 \end{document}
