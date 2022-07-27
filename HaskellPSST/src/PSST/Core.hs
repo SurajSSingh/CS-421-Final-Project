@@ -191,7 +191,7 @@ renumberCaptureGroup num (ln@(LiteralNode _):ns) = (finNum, ln : newNs)
         (finNum, newNs) = renumberCaptureGroup num ns
 
 wrapNodeInCaptureGroup :: RegexSequence -> RegexNode
-wrapNodeInCaptureGroup [CaptureGroupSequence num node] = CaptureGroupSequence 0 $ snd $ renumberCaptureGroup 1 node
+-- wrapNodeInCaptureGroup [CaptureGroupSequence num node] = CaptureGroupSequence 0 $ snd $ renumberCaptureGroup 1 node
 wrapNodeInCaptureGroup n = CaptureGroupSequence 0 $ snd $ renumberCaptureGroup 1 n
 
 --- ### Expressions

@@ -277,7 +277,7 @@ replaceOpP = try $ do
     maybeSpaceP
     rep <- strP <?> "a string"
     maybeSpaceP
-    x <- varP <?> "a variable"
+    x <- strP <?> "a string"
     maybeSpaceP
     return (OperatorExp "replace" pat (Just rep) (Just x))
 
@@ -289,7 +289,7 @@ replaceAllOpP = try $ do
     maybeSpaceP
     rep <- strP <?> "a string"
     maybeSpaceP
-    x <- varP <?> "a variable"
+    x <- strP <?> "a string"
     maybeSpaceP
     return (OperatorExp "replaceAll" pat (Just rep) (Just x))
 
@@ -308,7 +308,8 @@ checkOpP = try $ do
 stateOpP :: ParsecT String () Identity Exp
 stateOpP = try $ do
     state <- symbol "state"
-    return $ StateOpExp state Nothing
+    variable <- optionMaybe varP
+    return $ StateOpExp state variable
 
 simpleExprP :: Parser Exp
 simpleExprP = numP

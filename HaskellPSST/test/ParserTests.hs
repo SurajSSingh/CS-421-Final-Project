@@ -6,16 +6,25 @@ import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.HUnit (testCase, (@?=))
 
 parserTests :: TestTree
-parserTests = testGroup "Parser Tests" [parseStringToRegex]--[parseStringToTree, parseExpTest, parseErrorTest]
+parserTests = testGroup "Parser Tests" [parseStringToRegex, parseStringToExpression]
 
-nodeWrapper :: RegexSequence -> Either ParseError RegexNode
-nodeWrapper nodes = Right $ CaptureGroupSequence 0 nodes
+nodeWrapper :: RegexSequence -> RegexNode
+nodeWrapper = CaptureGroupSequence 0
+
+correctNodeWrapper :: RegexSequence -> Either ParseError RegexNode
+correctNodeWrapper nodes = Right $ nodeWrapper nodes
+
+regexExpNodeWrapper :: RegexSequence -> Exp
+regexExpNodeWrapper nodes = RegexExp $ nodeWrapper nodes
 
 regexNodeTestCaseHelper :: String -> RegexSequence -> TestTree
-regexNodeTestCaseHelper regexStr regexNode = testCase ("Parsing " ++ regexStr) (strSolParseRegex ("\"" ++ regexStr ++ "\"") @?= nodeWrapper regexNode)
+regexNodeTestCaseHelper regexStr regexNode = testCase ("Parsing " ++ regexStr) (strSolParseRegex ("\"" ++ regexStr ++ "\"") @?= correctNodeWrapper regexNode)
+
+parseStrToExpHelper :: String -> Exp -> TestTree
+parseStrToExpHelper str exp = testCase ("Parsing " ++ str) (strSolParse str @?= Right exp)
 
 parseStringToRegex :: TestTree
-parseStringToRegex = testGroup "Parse Regex String to Regex Node" 
+parseStringToRegex = testGroup "Parse Regex String to Regex Node"
     [ regularLiteralNodeParseTest
     , specialNodeParseTest
     , sequenceNodeParseTest
@@ -27,9 +36,18 @@ parseStringToRegex = testGroup "Parse Regex String to Regex Node"
     , curlyRepetitionNodeParseTest
     ]
 
+parseStringToExpression :: TestTree
+parseStringToExpression = testGroup "Parse String to Expression"
+    [ parseStringToNumberExp
+    , parseStringToVariableExp
+    , parseStringToRegexExp
+    , parseStringToAssignmentExp
+    , parseStringToRegexOpExp
+    , parseStringToStateOpExp
+    ]
 
 regularLiteralNodeParseTest :: TestTree
-regularLiteralNodeParseTest = testGroup "Regular Literal Nodes" 
+regularLiteralNodeParseTest = testGroup "Regular Literal Nodes"
     [ regexNodeTestCaseHelper "a" [sCharNode "a"]
     , regexNodeTestCaseHelper "B" [sCharNode "B"]
     , regexNodeTestCaseHelper "1" [sCharNode "1"]
@@ -38,7 +56,7 @@ regularLiteralNodeParseTest = testGroup "Regular Literal Nodes"
     ]
 
 specialNodeParseTest :: TestTree
-specialNodeParseTest = testGroup "Regular Literal Nodes" 
+specialNodeParseTest = testGroup "Regular Literal Nodes"
     [ regexNodeTestCaseHelper "." [anyCharNode]
     , regexNodeTestCaseHelper "" [epsilonNode]
     , regexNodeTestCaseHelper "\\." [sCharNode "\\."]
@@ -58,7 +76,7 @@ specialNodeParseTest = testGroup "Regular Literal Nodes"
     ]
 
 sequenceNodeParseTest :: TestTree
-sequenceNodeParseTest = testGroup "Sequence (Single Capture Group) Nodes" 
+sequenceNodeParseTest = testGroup "Sequence (Single Capture Group) Nodes"
     [ regexNodeTestCaseHelper "ab" [sCharNode "a", sCharNode "b"]
     , regexNodeTestCaseHelper "Cd1" [sCharNode "C", sCharNode "d", sCharNode "1"]
     , regexNodeTestCaseHelper "123" [sCharNode "1", sCharNode "2", sCharNode "3"]
@@ -67,28 +85,29 @@ sequenceNodeParseTest = testGroup "Sequence (Single Capture Group) Nodes"
     ]
 
 captureGroupParseTest :: TestTree
-captureGroupParseTest = testGroup "Multiple Capture Group Nodes" 
+captureGroupParseTest = testGroup "Multiple Capture Group Nodes"
     [ regexNodeTestCaseHelper "(a)" [CaptureGroupSequence 1 [sCharNode "a"]]
     , regexNodeTestCaseHelper "(ab)" [CaptureGroupSequence 1 [sCharNode "a", sCharNode "b"]]
+    , regexNodeTestCaseHelper "(abc)" [CaptureGroupSequence 1 [sCharNode "a", sCharNode "b", sCharNode "c"]]
     , regexNodeTestCaseHelper "(a)b" [CaptureGroupSequence 1 [sCharNode "a"], sCharNode "b"]
     , regexNodeTestCaseHelper "a(b)" [sCharNode "a", CaptureGroupSequence 1 [sCharNode "b"]]
     ]
 
 captureGroupStubParseTest :: TestTree
-captureGroupStubParseTest = testGroup "Capture Group Stub Nodes" 
+captureGroupStubParseTest = testGroup "Capture Group Stub Nodes"
     [ regexNodeTestCaseHelper "$1" [captureGroupStub 1]
     , regexNodeTestCaseHelper "($2)$3" [CaptureGroupSequence 1 [captureGroupStub 2], captureGroupStub 3]
     ]
 
 complementNodeParseTest :: TestTree
-complementNodeParseTest = testGroup "Complement Nodes" 
+complementNodeParseTest = testGroup "Complement Nodes"
     [ regexNodeTestCaseHelper "~a" [ComplementNode $ sCharNode "a"]
     , regexNodeTestCaseHelper "~ab" [ComplementNode $ sCharNode "a", sCharNode "b"]
     , regexNodeTestCaseHelper "~(ab)" [ComplementNode $ CaptureGroupSequence 1 [sCharNode "a", sCharNode "b"]]
     ]
 
 choiceNodeParseTest :: TestTree
-choiceNodeParseTest = testGroup "Choice Nodes" 
+choiceNodeParseTest = testGroup "Choice Nodes"
     [ regexNodeTestCaseHelper "a|b" [ChoiceNode (sCharNode "a") (sCharNode "b")]
     ,regexNodeTestCaseHelper "(a|b)" [CaptureGroupSequence 1 [ChoiceNode (sCharNode "a") (sCharNode "b")]]
     , regexNodeTestCaseHelper "a|oh" [ChoiceNode (sCharNode "a") (sCharNode "o"), sCharNode "h"]
@@ -98,7 +117,7 @@ choiceNodeParseTest = testGroup "Choice Nodes"
     ]
 
 symbolRepetitionParseTest :: TestTree
-symbolRepetitionParseTest = testGroup "Symbol Repetition Nodes" 
+symbolRepetitionParseTest = testGroup "Symbol Repetition Nodes"
     [ regexNodeTestCaseHelper "a*" [RepetitionNode False 0 Nothing $ sCharNode "a"]
     , regexNodeTestCaseHelper "a*?" [RepetitionNode True 0 Nothing $ sCharNode "a"]
     , regexNodeTestCaseHelper "a+" [RepetitionNode False 1 Nothing $ sCharNode "a"]
@@ -133,4 +152,96 @@ curlyRepetitionNodeParseTest = testGroup "Curly Repetition Nodes"
     , regexNodeTestCaseHelper "(ab){2,}?" [RepetitionNode True 2 Nothing $ CaptureGroupSequence 1 [sCharNode "a", sCharNode "b"]]
     , regexNodeTestCaseHelper "(ab){2}" [RepetitionNode False 2 (Just 2) $ CaptureGroupSequence 1 [sCharNode "a", sCharNode "b"]]
     , regexNodeTestCaseHelper "(ab){2}?" [RepetitionNode True 2 (Just 2) $ CaptureGroupSequence 1 [sCharNode "a", sCharNode "b"]]
+    ]
+
+parseStringToNumberExp :: TestTree
+parseStringToNumberExp = testGroup "Parse String to Number"
+    [ parseStrToExpHelper "1" $ IntExp 1
+    , parseStrToExpHelper "10   " $ IntExp 10
+    , parseStrToExpHelper "   21" $ IntExp 21
+    , parseStrToExpHelper "   210   " $ IntExp 210
+    ]
+
+parseStringToVariableExp :: TestTree
+parseStringToVariableExp = testGroup "Parse String to Variable"
+    [ parseStrToExpHelper "x" $ VarExp "x"
+    , parseStrToExpHelper "y1" $ VarExp "y1"
+    , parseStrToExpHelper "z_" $ VarExp "z_"
+    , parseStrToExpHelper "x_y" $ VarExp "x_y"
+    , parseStrToExpHelper "x_1z" $ VarExp "x_1z"
+    , parseStrToExpHelper "y_z1" $ VarExp "y_z1"
+    ]
+
+parseStringToRegexExp :: TestTree
+parseStringToRegexExp = testGroup "Parse String to Regex"
+    [ parseStrToExpHelper "\"\"" $ regexExpNodeWrapper [epsilonNode]
+    , parseStrToExpHelper "\".\"" $ regexExpNodeWrapper [anyCharNode]
+    , parseStrToExpHelper "\"a\"" $ regexExpNodeWrapper [sCharNode "a"]
+    ]
+
+parseStringToRegexOpExp :: TestTree
+parseStringToRegexOpExp = testGroup "Parse String to Regex Operation"
+    [ parseStrToExpHelper "single \".\"" $ OperatorExp "singleton" (regexExpNodeWrapper [anyCharNode]) Nothing Nothing
+    , parseStrToExpHelper "single \"a\"" $ OperatorExp "singleton" (regexExpNodeWrapper [sCharNode "a"]) Nothing Nothing
+    , parseStrToExpHelper "single \"\"" $ OperatorExp "singleton" (regexExpNodeWrapper [epsilonNode]) Nothing Nothing
+    , parseStrToExpHelper ":S \".\"" $ OperatorExp "singleton" (regexExpNodeWrapper [anyCharNode]) Nothing Nothing
+    , parseStrToExpHelper ":S \"a\"" $ OperatorExp "singleton" (regexExpNodeWrapper [sCharNode "a"]) Nothing Nothing
+    , parseStrToExpHelper ":S \"\"" $ OperatorExp "singleton" (regexExpNodeWrapper [epsilonNode]) Nothing Nothing
+    , parseStrToExpHelper "subset \".\" \"\"" $ OperatorExp "subset" (regexExpNodeWrapper [anyCharNode]) (Just (regexExpNodeWrapper [epsilonNode])) Nothing
+    , parseStrToExpHelper ":s \".\" \"\"" $ OperatorExp "subset" (regexExpNodeWrapper [anyCharNode]) (Just (regexExpNodeWrapper [epsilonNode])) Nothing
+    , parseStrToExpHelper "extract 1 \".\" \"a\"" $ OperatorExp "extract" (IntExp 1) (Just $ regexExpNodeWrapper [anyCharNode]) (Just (regexExpNodeWrapper [sCharNode "a"]))
+    , parseStrToExpHelper ":e 1 \".\" \"a\"" $ OperatorExp "extract" (IntExp 1) (Just $ regexExpNodeWrapper [anyCharNode]) (Just (regexExpNodeWrapper [sCharNode "a"]))
+    , parseStrToExpHelper "replace \".\" \"\" \"a\"" $ OperatorExp "replace" (regexExpNodeWrapper [anyCharNode]) (Just (regexExpNodeWrapper [epsilonNode])) (Just (regexExpNodeWrapper [sCharNode "a"]))
+    , parseStrToExpHelper ":r \".\" \"\" \"a\"" $ OperatorExp "replace" (regexExpNodeWrapper [anyCharNode]) (Just (regexExpNodeWrapper [epsilonNode])) (Just (regexExpNodeWrapper [sCharNode "a"]))
+    , parseStrToExpHelper "replaceAll \".\" \"\" \"a\"" $ OperatorExp "replaceAll" (regexExpNodeWrapper [anyCharNode]) (Just (regexExpNodeWrapper [epsilonNode])) (Just (regexExpNodeWrapper [sCharNode "a"]))
+    , parseStrToExpHelper ":R \".\" \"\" \"a\"" $ OperatorExp "replaceAll" (regexExpNodeWrapper [anyCharNode]) (Just (regexExpNodeWrapper [epsilonNode])) (Just (regexExpNodeWrapper [sCharNode "a"]))
+    , parseStrToExpHelper "union \".\" \"\"" $ OperatorExp "union" (regexExpNodeWrapper [anyCharNode]) (Just (regexExpNodeWrapper [epsilonNode])) Nothing
+    , parseStrToExpHelper ":u \".\" \"\"" $ OperatorExp "union" (regexExpNodeWrapper [anyCharNode]) (Just (regexExpNodeWrapper [epsilonNode])) Nothing
+    , parseStrToExpHelper ":u \".\" :u \"\" \"a\"" $ OperatorExp "union" (regexExpNodeWrapper [anyCharNode]) (Just (OperatorExp "union" (regexExpNodeWrapper [epsilonNode]) (Just (regexExpNodeWrapper [sCharNode "a"])) Nothing)) Nothing
+    , parseStrToExpHelper "unify \".\" \"\"" $ OperatorExp "unify" (regexExpNodeWrapper [anyCharNode]) (Just (regexExpNodeWrapper [epsilonNode])) Nothing
+    , parseStrToExpHelper ":n \".\" \"\"" $ OperatorExp "unify" (regexExpNodeWrapper [anyCharNode]) (Just (regexExpNodeWrapper [epsilonNode])) Nothing
+    , parseStrToExpHelper ":n \".\" :n \"\" \"a\"" $ OperatorExp "unify" (regexExpNodeWrapper [anyCharNode]) (Just (OperatorExp "unify" (regexExpNodeWrapper [epsilonNode]) (Just (regexExpNodeWrapper [sCharNode "a"])) Nothing)) Nothing
+    , parseStrToExpHelper "\".\" + \"\"" $ OperatorExp "concat" (regexExpNodeWrapper [anyCharNode]) (Just (regexExpNodeWrapper [epsilonNode])) Nothing
+    , parseStrToExpHelper "\".\" + \"\" + \"a\"" $ OperatorExp "concat" (regexExpNodeWrapper [anyCharNode]) (Just (OperatorExp "concat" (regexExpNodeWrapper [epsilonNode]) (Just (regexExpNodeWrapper [sCharNode "a"])) Nothing)) Nothing
+    ]
+
+parseStringToAssignmentExp :: TestTree
+parseStringToAssignmentExp = testGroup "Parse String to Assignment Operation" 
+    [parseStringToAssignmentSimple, parseStringToAssignmentWithOperator]
+
+parseStringToAssignmentSimple :: TestTree
+parseStringToAssignmentSimple = testGroup "Parse String with Simple Assignment" 
+    [ parseStrToExpHelper "x = \"\"" $ AssignmentExp "x" (regexExpNodeWrapper [epsilonNode])
+    , parseStrToExpHelper "y_1 = \".\"" $ AssignmentExp "y_1" (regexExpNodeWrapper [anyCharNode])
+    , parseStrToExpHelper "z = a" $ AssignmentExp "z" (VarExp "a")
+    ]
+
+parseStringToAssignmentWithOperator :: TestTree
+parseStringToAssignmentWithOperator = testGroup "Parse String with Complex Assignment" 
+    [ parseStrToExpHelper "x = \".\" + \"\"" $ AssignmentExp "x" (OperatorExp "concat" (regexExpNodeWrapper [anyCharNode]) (Just (regexExpNodeWrapper [epsilonNode])) Nothing)
+    , parseStrToExpHelper "x = \".\" + \"\" + \"a\"" $ AssignmentExp "x" (OperatorExp "concat" (regexExpNodeWrapper [anyCharNode]) (Just (OperatorExp "concat" (regexExpNodeWrapper [epsilonNode]) (Just (regexExpNodeWrapper [sCharNode "a"])) Nothing)) Nothing)
+    , parseStrToExpHelper "x = extract 1 \".\" \"a\"" $ AssignmentExp "x" (OperatorExp "extract" (IntExp 1) (Just $ regexExpNodeWrapper [anyCharNode]) (Just (regexExpNodeWrapper [sCharNode "a"])))
+    , parseStrToExpHelper "x = :e 1 \".\" \"a\"" $ AssignmentExp "x" (OperatorExp "extract" (IntExp 1) (Just $ regexExpNodeWrapper [anyCharNode]) (Just (regexExpNodeWrapper [sCharNode "a"])))
+    , parseStrToExpHelper "x = replace \".\" \"\" \"a\"" $ AssignmentExp "x" (OperatorExp "replace" (regexExpNodeWrapper [anyCharNode]) (Just (regexExpNodeWrapper [epsilonNode])) (Just (regexExpNodeWrapper [sCharNode "a"])))
+    , parseStrToExpHelper "x = :r \".\" \"\" \"a\"" $ AssignmentExp "x" (OperatorExp "replace" (regexExpNodeWrapper [anyCharNode]) (Just (regexExpNodeWrapper [epsilonNode])) (Just (regexExpNodeWrapper [sCharNode "a"])))
+    , parseStrToExpHelper "x = replaceAll \".\" \"\" \"a\"" $ AssignmentExp "x" (OperatorExp "replaceAll" (regexExpNodeWrapper [anyCharNode]) (Just (regexExpNodeWrapper [epsilonNode])) (Just (regexExpNodeWrapper [sCharNode "a"])))
+    , parseStrToExpHelper "x = :R \".\" \"\" \"a\"" $ AssignmentExp "x" (OperatorExp "replaceAll" (regexExpNodeWrapper [anyCharNode]) (Just (regexExpNodeWrapper [epsilonNode])) (Just (regexExpNodeWrapper [sCharNode "a"])))
+    , parseStrToExpHelper "x = union \".\" \"\"" $ AssignmentExp "x" (OperatorExp "union" (regexExpNodeWrapper [anyCharNode]) (Just (regexExpNodeWrapper [epsilonNode])) Nothing)
+    , parseStrToExpHelper "x = :u \".\" \"\"" $ AssignmentExp "x" (OperatorExp "union" (regexExpNodeWrapper [anyCharNode]) (Just (regexExpNodeWrapper [epsilonNode])) Nothing)
+    , parseStrToExpHelper "x = :u \".\" :u \"\" \"a\"" $ AssignmentExp "x" (OperatorExp "union" (regexExpNodeWrapper [anyCharNode]) (Just (OperatorExp "union" (regexExpNodeWrapper [epsilonNode]) (Just (regexExpNodeWrapper [sCharNode "a"])) Nothing)) Nothing)
+    , parseStrToExpHelper "x = unify \".\" \"\"" $ AssignmentExp "x" (OperatorExp "unify" (regexExpNodeWrapper [anyCharNode]) (Just (regexExpNodeWrapper [epsilonNode])) Nothing)
+    , parseStrToExpHelper "x = :n \".\" \"\"" $ AssignmentExp "x" (OperatorExp "unify" (regexExpNodeWrapper [anyCharNode]) (Just (regexExpNodeWrapper [epsilonNode])) Nothing)
+    , parseStrToExpHelper "x = :n \".\" :n \"\" \"a\"" $ AssignmentExp "x" (OperatorExp "unify" (regexExpNodeWrapper [anyCharNode]) (Just (OperatorExp "unify" (regexExpNodeWrapper [epsilonNode]) (Just (regexExpNodeWrapper [sCharNode "a"])) Nothing)) Nothing)
+    ]
+
+parseStringToStateOpExp :: TestTree
+parseStringToStateOpExp = testGroup "Parse String to State Operation"
+    [ parseStrToExpHelper "check" $ StateOpExp "check" Nothing
+    , parseStrToExpHelper "check x" $ StateOpExp "check" (Just $ VarExp"x")
+    , parseStrToExpHelper "solve" $ StateOpExp "solve" Nothing
+    , parseStrToExpHelper "solve x" $ StateOpExp "solve" (Just $ VarExp"x")
+    , parseStrToExpHelper "clear" $ StateOpExp "clear" Nothing
+    , parseStrToExpHelper "clear x" $ StateOpExp "clear" (Just $ VarExp"x")
+    , parseStrToExpHelper "state" $ StateOpExp "state" Nothing
+    , parseStrToExpHelper "state x" $ StateOpExp "state" (Just $ VarExp"x")
     ]

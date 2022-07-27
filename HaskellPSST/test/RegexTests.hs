@@ -4,7 +4,7 @@ import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.HUnit (testCase, (@?=), Assertion)
 import PSST.Parser (strSolParseRegex)
 import qualified Text.Parsec as Text.Parsec.Error
-import PSST.Core (RegexNode (CaptureGroupSequence), emptySetNode)
+import PSST.Core (RegexNode (CaptureGroupSequence), emptySet)
 import PSST.RTOperations (isNodeSingleton, regexUnify, regexUnion)
 
 regexNodeGenerator :: String -> RegexNode
@@ -20,7 +20,7 @@ binaryRegexOpHelper f a b x = f (regexNodeGenerator a) (regexNodeGenerator b) @?
 
 unifyOpHelper :: String -> String -> Maybe String -> TestTree
 unifyOpHelper a b x = testCase ("Unify: " ++ a ++ " & " ++  b) (case x of
-   Nothing -> regexUnify (regexNodeGenerator a) (regexNodeGenerator b) @?= emptySetNode
+   Nothing -> regexUnify (regexNodeGenerator a) (regexNodeGenerator b) @?= emptySet
    Just s -> binaryRegexOpHelper regexUnify a b s)
 
 unionOpHelper :: String -> String -> String -> TestTree
