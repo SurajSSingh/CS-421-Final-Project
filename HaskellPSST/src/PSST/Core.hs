@@ -12,6 +12,25 @@ requireEscapeRegexSymbol = ["(", ")", "|", "?", "*", "+", "$", "."]
 escapedRegexSymbol :: [String]
 escapedRegexSymbol = ["\\(", "\\)", "\\|", "\\?", "\\*", "\\+", "\\$", "\\."]
 
+
+--- ### General Helper Functions
+maybeMin :: Maybe Int -> Maybe Int -> Maybe Int
+maybeMin Nothing Nothing = Nothing
+maybeMin Nothing (Just y) = Just y
+maybeMin (Just x) Nothing = Just x
+maybeMin (Just x) (Just y)
+    | x <= y = Just x
+    | otherwise = Just y
+
+maybeMax :: Maybe Int -> Maybe Int -> Maybe Int
+maybeMax Nothing Nothing = Nothing
+maybeMax Nothing (Just y) = Nothing
+maybeMax (Just x) Nothing = Nothing
+maybeMax (Just x) (Just y)
+    | x >= y = Just x
+    | otherwise = Just y
+
+
 --- ### Environment
 type Env = H.HashMap String [Exp]
 type EvalState a = StateT Env (Except Diagnostic) a
@@ -100,7 +119,7 @@ isSubNode n (ComplementNode c) = not $ n `isSubNode` c
 isSubNode (RepetitionNode _ s1 me1 r1) (RepetitionNode _ s2 me2 r2)
     | s2 <= s1 && me1 `maybeLTE` me2 = r1 `isSubNode` r2
 isSubNode n (RepetitionNode _ s (Just e) r)
-    | e == 0 && n == epsilonNode = True
+    | s == 0 && n == epsilonNode = True
     | e > 0 = n `isSubNode` r
 isSubNode n (RepetitionNode _ s Nothing r)
     | s < 2 = n `isSubNode` r
