@@ -121,6 +121,8 @@ epsilonNode :: RegexNode
 epsilonNode = LiteralNode $ Left False
 anyCharNode :: RegexNode
 anyCharNode = LiteralNode $ Left True
+everyThingNode :: RegexNode
+everyThingNode = RepetitionNode False 0 Nothing anyCharNode
 -- s = single or specific
 sCharNode :: String -> RegexNode
 sCharNode c = LiteralNode $ Right c
@@ -132,12 +134,12 @@ optionalNode :: Bool -> RegexNode -> RegexNode
 optionalNode l = RepetitionNode l 0 (Just 1)
 captureGroupStub :: Int -> RegexNode
 captureGroupStub n = CaptureGroupSequence (-n) []
-emptySetNode :: RegexNode
-emptySetNode = CaptureGroupSequence 0 []
+emptySet :: RegexNode
+emptySet = CaptureGroupSequence 0 []
 nullNode :: RegexNode
-nullNode = emptySetNode
+nullNode = emptySet
 isEmpty :: RegexNode -> Bool
-isEmpty n = n == emptySetNode
+isEmpty n = n == emptySet
 
 --- Helper Functions
 renumberCaptureGroup :: Int -> RegexSequence -> (Int, RegexSequence)
@@ -168,6 +170,7 @@ renumberCaptureGroup num (ln@(LiteralNode _):ns) = (finNum, ln : newNs)
         (finNum, newNs) = renumberCaptureGroup num ns
 
 wrapNodeInCaptureGroup :: RegexSequence -> RegexNode
+wrapNodeInCaptureGroup [CaptureGroupSequence num node] = CaptureGroupSequence 0 $ snd $ renumberCaptureGroup 1 node
 wrapNodeInCaptureGroup n = CaptureGroupSequence 0 $ snd $ renumberCaptureGroup 1 n
 
 --- ### Expressions

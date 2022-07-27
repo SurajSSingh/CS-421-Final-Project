@@ -88,7 +88,6 @@ singletonOp _ (Just x) Nothing = throwError $ NumOfArgumentsError "Singleton" 1 
 singletonOp _ Nothing (Just x) = throwError $ NumOfArgumentsError "Singleton" 1 2 ["2nd argument: " ++show x]
 singletonOp e1 (Just x) (Just y) = throwError $ NumOfArgumentsError "Singleton" 1 3 [show e1, show x, show y]
 
---- TODO: Check that subset works correctly for complements
 subsetOp :: Exp -> Maybe Exp -> Maybe Exp -> EvalState Exp
 -- Number of Argument Errors
 subsetOp e1 Nothing Nothing = throwError $ NumOfArgumentsError "Subset" 2 1 ["only " ++ show e1]

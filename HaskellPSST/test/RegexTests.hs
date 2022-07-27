@@ -1,8 +1,11 @@
 module RegexTests (regexTreeTest) where
--- import PSST.Core
--- import PSST.RTOperations
+
 import Test.Tasty (TestTree, testGroup)
-import Test.Tasty.HUnit (testCase, (@?=))
+import Test.Tasty.HUnit (testCase, (@?=), Assertion)
+import PSST.Parser (strSolParseRegex)
+import qualified Text.Parsec as Text.Parsec.Error
+import PSST.Core (RegexNode (CaptureGroupSequence), emptySetNode)
+import PSST.RTOperations (isNodeSingleton, regexUnify, regexUnion)
 
 -- simpleLiteral = Literal "a"
 -- simpleSequence = Sequence [AnyCharLiteral, simpleLiteral]
@@ -12,8 +15,77 @@ import Test.Tasty.HUnit (testCase, (@?=))
 -- simplePlusRepetition tree = Repetition True 0 Nothing tree
 -- simpleOptRepetition tree = Repetition True 0 (Just 1) tree
 
+regexNodeGenerator :: String -> RegexNode
+regexNodeGenerator regexStr = case strSolParseRegex ("\"" ++ regexStr ++ "\"") of
+  Left pe -> CaptureGroupSequence 0 []
+  Right rn -> rn
+
+singletonTestHelper :: String -> Bool -> TestTree
+singletonTestHelper s b = testCase ("Singleton: " ++ s) (isNodeSingleton (regexNodeGenerator s) @?= b)
+
+binaryRegexOpHelper :: (RegexNode -> RegexNode -> RegexNode) -> String -> String -> String -> Assertion
+binaryRegexOpHelper f a b x = f (regexNodeGenerator a) (regexNodeGenerator b) @?= regexNodeGenerator x
+
+unifyOpHelper :: String -> String -> Maybe String -> TestTree
+unifyOpHelper a b x = testCase ("Unify: " ++ a ++ " & " ++  b) (case x of
+   Nothing -> regexUnify (regexNodeGenerator a) (regexNodeGenerator b) @?= emptySetNode
+   Just s -> binaryRegexOpHelper regexUnify a b s)
+
+unionOpHelper :: String -> String -> String -> TestTree
+unionOpHelper a b x = testCase ("Union: " ++ a ++ " | " ++  b) $ binaryRegexOpHelper regexUnion a b x
+
 regexTreeTest :: TestTree
-regexTreeTest = testGroup "Regex Tree Operations Tests" []-- [maybeLTETests, updateCaptureGroupNumberTests, regexTreeUnion, singletonTests, subLangTests, unifyTests]
+regexTreeTest = testGroup "Regex Tree Operations Tests"
+    [singletonTests, regexUnionTests, regexUnifyTests]
+
+singletonTests :: TestTree
+singletonTests = testGroup "Singleton Tests"
+    [ singletonTestHelper "" True
+    , singletonTestHelper "." False
+    , singletonTestHelper "a" True
+    , singletonTestHelper "(a)" True
+    , singletonTestHelper "((a)b)" True
+    , singletonTestHelper "abc" True
+    , singletonTestHelper "a|b" False
+    , singletonTestHelper "a|a" True
+    , singletonTestHelper "a?" False
+    , singletonTestHelper "a*" False
+    , singletonTestHelper "a+" False
+    , singletonTestHelper "a{2}" True
+    , singletonTestHelper "a{2,4}" False
+    , singletonTestHelper "a{2,}" False
+    ]
+
+regexSubNodeTests :: TestTree
+regexSubNodeTests = testGroup "Regex Sub-Nodes Tests" []
+
+
+regexUnionTests :: TestTree
+regexUnionTests = testGroup "Regex Union Tests"
+    [ unionOpHelper "a" "a" "a"
+    , unionOpHelper "a" "b" "a|b"
+    , unionOpHelper "a" "" "a?"
+    , unionOpHelper "a|b" "c|d" "(a|b)|(c|d)"
+    , unionOpHelper "a" "a?" "a?"
+    , unionOpHelper "a" "a??" "a??"
+    , unionOpHelper "a+" "a*" "a*"
+    , unionOpHelper "a+" "a?" "a+"
+    , unionOpHelper "a?" "a*" "a*"
+    ]
+
+regexUnifyTests :: TestTree
+regexUnifyTests = testGroup "Regex Unify Tests"
+    [ unifyOpHelper "a" "a" $ Just "a"
+    , unifyOpHelper "a" "b" Nothing
+    , unifyOpHelper "a" "a?" $ Just "a"
+    , unifyOpHelper "a" "a??" $ Just "a"
+    , unifyOpHelper "a+" "a*" $ Just "a+"
+    , unifyOpHelper "a+" "a?" $ Just "a?"
+    , unifyOpHelper "a?" "a*" $ Just "a?"
+    , unifyOpHelper "a|b" "b|a" $ Just "a|b"
+    ]
+
+-- [maybeLTETests, updateCaptureGroupNumberTests, regexTreeUnion, singletonTests, subLangTests, unifyTests]
 
 -- maybeLTETests :: TestTree
 -- maybeLTETests = testGroup "Maybe Less Than or Equal To Tests" 
@@ -32,7 +104,7 @@ regexTreeTest = testGroup "Regex Tree Operations Tests" []-- [maybeLTETests, upd
 -- unifyTests :: TestTree
 -- unifyTests = testGroup "Regex Tree Unification Tests" 
 --   []
-  
+
 -- unionTests :: TestTree
 -- unionTests = testGroup "Regex Tree Union Tests" 
 --   []
