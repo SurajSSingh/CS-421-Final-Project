@@ -83,7 +83,9 @@ unifyOp e1 e2 Nothing = throwError $ InvalidArgumentsError "Unify" ["First expre
 singletonOp :: Exp -> Maybe Exp -> Maybe Exp -> EvalState Exp
 singletonOp (RegexExp re1) Nothing Nothing = do
   return $ ResultValExp $ show $ isNodeSingleton re1
+-- Invalid Expression Errors
 singletonOp e1 Nothing Nothing = throwError $ InvalidArgumentsError "Singleton" ["Expression is not valid regex: " ++ show e1]
+-- Number of Argument Errors
 singletonOp _ (Just x) Nothing = throwError $ NumOfArgumentsError "Singleton" 1 2 ["2nd argument: " ++ show x]
 singletonOp _ Nothing (Just x) = throwError $ NumOfArgumentsError "Singleton" 1 2 ["2nd argument: " ++show x]
 singletonOp e1 (Just x) (Just y) = throwError $ NumOfArgumentsError "Singleton" 1 3 [show e1, show x, show y]
@@ -139,13 +141,14 @@ mapListAdd var val env = case H.lookup var env of
     Nothing -> H.insert var [val] env
 
 
+--- ## Eval function
 eval :: Exp -> EvalState Exp
 --- ### Value-like expressions --> return the expression directly
 eval iExp@(IntExp i) = return iExp
 eval sExp@(RegexExp s) = return sExp
 eval rExp@(ResultValExp r) = return rExp
 
---- ### Variable expressions --> return the expressions if variable is defined, or throw error
+--- ### Variable expressions --> return the expressions associated with the variable if variable is defined, or throw error
 eval (VarExp var) = do
     env <- get
     case H.lookup var env of

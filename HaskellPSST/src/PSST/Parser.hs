@@ -1,3 +1,5 @@
+--- # Parser Module
+--- ## Adapted from 
 module PSST.Parser (strSolParse, strSolParseRegex) where
 import PSST.Core
 
@@ -11,25 +13,19 @@ import Data.List
 import Data.Char
 import Data.Maybe (fromMaybe, isJust)
 
+--- ## 
 type Parser = ParsecT String () Identity
 
 --- ### Helper Info
+--- #### Keywords: word that perform operations, cannot be variable names
 keywords :: [String]
 keywords = ["extract", "replace", "replaceAll", ":e", ":r", ":R", "clear", "check", "state", "solve", "unify", ":n", "subset", ":s", "singleton", ":S",  "union", ":u"]
+--- #### Special symbols used by regex, required to be escaped if they are used
 regexSpecialSymbols :: [Char]
 regexSpecialSymbols = ['(', ')', '|', '$', '.', '~', '?', '*', '+', '{', '}']
+--- #### Digits of integer, probably a better way of doing this
 digits :: [String]
 digits = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]
-
-numberStringSpliter :: [String] -> (Maybe Int, [String])
-numberStringSpliter = aux []
-    where
-        aux :: [String] -> [String] -> (Maybe Int, [String])
-        aux [] [] = (Nothing, [])
-        aux [] c = (Nothing, c)
-        aux n [] = (Just (read (intercalate "" n) :: Int), [])
-        aux n c@(x:xs) = if x `elem` digits then aux (n ++ [x]) xs else (Just (read (intercalate "" n) :: Int), c)
-
 
 --- ### Lexers
 --- #### Notes to self:
@@ -58,8 +54,31 @@ var = try $ do
     then fail ("got a keyword: " ++ show v ++ " in " ++ show keywords)
     else return v
 
+--- Adapted from https://stackoverflow.com/questions/24106314/parser-for-quoted-string-using-parsec
+--- #### Get an escaped character
+escape :: Parser String
+escape = do
+    d <- char '\\'
+    c <- oneOf $
+        ['\\','"','0','n','r','v','t','b','f'] -- all regular characters which can be escaped
+        ++
+        regexSpecialSymbols -- all regex characters which can be escaped
+    return [d, c]
 
---- Regex Parse
+--- #### Get a non-escaped character
+nonEscape :: Parser Char
+nonEscape = noneOf $ ['\\','"','\0','\n','\r','\v','\t','\b','\f'] ++ regexSpecialSymbols
+
+--- #### Get a character that is either escaped special character or regular non-escaped character
+rCharacter :: Parser String
+rCharacter = fmap return nonEscape <|> escape
+
+--- #### Get a possible, many whitespace characters
+maybeSpaceP :: Parser String
+maybeSpaceP = many $ oneOf " \n\t"
+
+--- ### Regex Parse
+--- #### Create Literal Character Node by reading a single character
 literalCharNodeParse :: Parser RegexNode
 literalCharNodeParse = do
     litChar <- rCharacter
@@ -67,17 +86,20 @@ literalCharNodeParse = do
         ""  -> return epsilonNode
         c   -> return $ sCharNode litChar
 
+--- #### Create an Any Character Literal Node by reading a dot
 anyCharNodeParse :: Parser RegexNode
 anyCharNodeParse = do
     char '.'
     return anyCharNode
 
+--- #### Create a Complement Node by reading a negation symbol and getting the next node
 complementNodeParse :: Parser RegexNode
 complementNodeParse = do
     char '~'  <?> "a complement symbol"
     n <- nodeParse <?> "a regex node"
     return $ ComplementNode n
 
+--- #### Create a Choice Node by reading the previous node, then a pipe symbol, then the next node 
 choiceNodeParse :: Parser RegexNode
 choiceNodeParse = try $ do
     a <- forwardOnlyNodeParse <?> "a regex node"
@@ -85,6 +107,7 @@ choiceNodeParse = try $ do
     b <- forwardOnlyNodeParse <?> "a regex node"
     return $ ChoiceNode a b
 
+--- #### Create a Repetition Node by reading the previous node and then a symbolic repetition symbol
 symbolRepetitionNodeParse :: Parser RegexNode
 symbolRepetitionNodeParse = try $ do
     n <- forwardOnlyNodeParse <?> "a regex node"
@@ -96,6 +119,7 @@ symbolRepetitionNodeParse = try $ do
         '?' -> return $ optionalNode (isJust l) n
         _ -> unexpected "unknown repeating character"
 
+--- #### Create a Repetition Node by reading the previous node and then reading a curly brace with the repeating start and maybe end
 curlyRepetitionNodeParse :: Parser RegexNode
 curlyRepetitionNodeParse = try $ do
     n <- forwardOnlyNodeParse <?> "a regex node"
@@ -112,6 +136,7 @@ curlyRepetitionNodeParse = try $ do
       -- Bounded repetition
       Just _ -> return $ RepetitionNode (isJust l) x y n
 
+--- #### Create a Capture Group Sequence by reading an opening parentheses, then reading multiple nodes, and finally a closing parentheses
 captureGroupParse :: Parser RegexNode
 captureGroupParse = do
     char '('
@@ -119,11 +144,13 @@ captureGroupParse = do
     char ')'
     return $ CaptureGroupSequence 0 n
 
+--- #### Create a Capture Group Stub (filled in for replacement) by reading the stub symbol and then a number
 captureGroupStubParse :: Parser RegexNode
 captureGroupStubParse = do
     char '$'
     captureGroupStub <$> int <?> "a number"
 
+--- #### Parse nodes that only need to be parsed forwards without relying on previous nodes
 forwardOnlyNodeParse :: Parser RegexNode
 forwardOnlyNodeParse = complementNodeParse
                 <|> captureGroupParse
@@ -132,6 +159,7 @@ forwardOnlyNodeParse = complementNodeParse
                 <|> literalCharNodeParse
                 <?> "a valid non-choice regex node"
 
+--- #### Parse any kind of nodes, even if they require previous nodes to work 
 nodeParse :: Parser RegexNode
 nodeParse = choiceNodeParse
           <|> symbolRepetitionNodeParse
@@ -139,6 +167,8 @@ nodeParse = choiceNodeParse
           <|> forwardOnlyNodeParse
           <?> "a valid regex node"
 
+--- #### Parse a regex string by reading in-between the quote characters and extracting the final regex node.
+---      A special case for empty string is that it gets turned into an epsilon node 
 regexStringParse :: Parser RegexNode
 regexStringParse = try $ do
     char '"' <?> "opening quote"
@@ -147,37 +177,6 @@ regexStringParse = try $ do
     case nodes of
       [] -> return $ wrapNodeInCaptureGroup [epsilonNode]
       _ -> return $ wrapNodeInCaptureGroup nodes
-
-
--- Adapted from https://stackoverflow.com/questions/24106314/parser-for-quoted-string-using-parsec
-escape :: Parser String
-escape = do
-    d <- char '\\'
-    c <- oneOf $
-        ['\\','"','0','n','r','v','t','b','f'] -- all regular characters which can be escaped
-        ++
-        regexSpecialSymbols -- all regex characters which can be escaped
-    return [d, c]
-
-nonEscape :: Parser Char
-nonEscape = noneOf $ ['\\','"','\0','\n','\r','\v','\t','\b','\f'] ++ regexSpecialSymbols
-
-rCharacter :: Parser String
-rCharacter = fmap return nonEscape <|> escape
-
--- regex :: Parser RegexNode
--- regex = try $ do
---     char '"' <?> "OPEN QUOTE"
---     strings <- many rCharacter
---     char '"' <?> "CLOSE QUOTE"
---     return $ regexTreeBuilder strings
-
-maybeSpaceP :: Parser String
-maybeSpaceP = many $ oneOf " \n\t"
-
-spaceP :: Parser String
-spaceP = many1 $ oneOf " \n\t"
-
 
 --- ### Expression parsers
 
@@ -188,13 +187,8 @@ numP = IntExp <$> int <?> "an integer"
 --- #### Read a string (regex) value
 strP :: ParsecT String () Identity Exp
 strP = do
-    -- complement <- optionMaybe $ symbol "!" <|> symbol "~"
     r <- regexStringParse <?> "a regex string"
     return $ RegexExp r
-    -- case complement of
-    --   Nothing -> return $ ValExp $ RegexVal False r
-    --   Just s -> return $ ValExp $ RegexVal True r
-
 
 --- #### Read a variable name value
 varP :: ParsecT String () Identity Exp
@@ -208,7 +202,7 @@ assignmentP = try $ do
     val <- simpleExprP <?> "any simple expression"
     return $ AssignmentExp var val
 
-
+--- #### Read the concatenation operation
 concatOpP :: ParsecT String () Identity Exp
 concatOpP = try $ do
     exp1 <- varP <|> strP <?> "a variable or string"
@@ -219,6 +213,7 @@ concatOpP = try $ do
     maybeSpaceP
     return (OperatorExp "concat" exp1 (Just exp2) Nothing)
 
+--- #### Read the union operation
 unionOpP :: ParsecT String () Identity Exp
 unionOpP = try $ do
     union <- symbol "union" <|> symbol ":u"
@@ -229,6 +224,7 @@ unionOpP = try $ do
     maybeSpaceP
     return (OperatorExp "union" exp1 (Just exp2) Nothing)
 
+--- #### Read the unify (intersection) operation
 unifyOpP :: ParsecT String () Identity Exp
 unifyOpP = try $ do
     unify <- symbol "unify" <|> symbol ":n"
@@ -239,6 +235,7 @@ unifyOpP = try $ do
     maybeSpaceP
     return (OperatorExp "unify" exp1 (Just exp2) Nothing)
 
+--- #### Read the singleton operation
 singletonOpP :: ParsecT String () Identity Exp
 singletonOpP = try $ do
     unify <- symbol "single" <|> symbol ":S"
@@ -247,6 +244,7 @@ singletonOpP = try $ do
     maybeSpaceP
     return (OperatorExp "singleton" exp1 Nothing Nothing)
 
+--- #### Read the subset operation
 subsetOpP :: ParsecT String () Identity Exp
 subsetOpP = try $ do
     unify <- symbol "subset" <|> symbol ":s"
@@ -257,6 +255,7 @@ subsetOpP = try $ do
     maybeSpaceP
     return (OperatorExp "subset" exp1 (Just exp2) Nothing)
 
+--- #### Read the extraction operation
 extractOpP :: ParsecT String () Identity Exp
 extractOpP = try $ do
     symbol "extract" <|> symbol ":e"
@@ -269,6 +268,7 @@ extractOpP = try $ do
     maybeSpaceP
     return (OperatorExp "extract" i (Just e) (Just x))
 
+--- #### Read the replacement operation
 replaceOpP :: ParsecT String () Identity Exp
 replaceOpP = try $ do
     symbol "replace" <|> symbol ":r"
@@ -281,6 +281,7 @@ replaceOpP = try $ do
     maybeSpaceP
     return (OperatorExp "replace" pat (Just rep) (Just x))
 
+--- #### Read the replace all operation
 replaceAllOpP :: ParsecT String () Identity Exp
 replaceAllOpP = try $ do
     symbol "replaceAll" <|> symbol ":R"
@@ -293,24 +294,28 @@ replaceAllOpP = try $ do
     maybeSpaceP
     return (OperatorExp "replaceAll" pat (Just rep) (Just x))
 
+--- #### Read the clear operation
 clearOpP :: ParsecT String () Identity Exp
 clearOpP = try $ do
     clear <- symbol "clear"
     variable <- optionMaybe varP
     return $ StateOpExp clear variable
 
+--- #### Read the check/solve operation
 checkOpP :: ParsecT String () Identity Exp
 checkOpP = try $ do
     clear <- symbol "check" <|> symbol "solve"
     variable <- optionMaybe varP
     return $ StateOpExp clear variable
 
+--- #### Read the state operation
 stateOpP :: ParsecT String () Identity Exp
 stateOpP = try $ do
     state <- symbol "state"
     variable <- optionMaybe varP
     return $ StateOpExp state variable
 
+--- #### Read simple (composable) expression
 simpleExprP :: Parser Exp
 simpleExprP = numP
             <|> unionOpP
@@ -323,6 +328,7 @@ simpleExprP = numP
             <|> varP
             <?> "a simple value"
 
+--- #### Read raw expression (may or may not be composable)
 rawExprP :: Parser Exp
 rawExprP = checkOpP
        <|> clearOpP
@@ -333,12 +339,15 @@ rawExprP = checkOpP
        <|> simpleExprP
        <?> "a value"
 
+--- #### Read an expression
 exprP :: Parser Exp
 exprP = between maybeSpaceP maybeSpaceP rawExprP <* eof
 
--- Parser
+--- ### Parser
+--- #### Try to parse an expression
 strSolParse :: String -> Either ParseError Exp
 strSolParse = parse exprP "Error"
 
+--- #### Try to parse a regex
 strSolParseRegex :: String -> Either ParseError RegexNode
 strSolParseRegex = parse regexStringParse "Error"
