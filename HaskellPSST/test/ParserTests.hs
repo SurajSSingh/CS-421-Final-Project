@@ -109,6 +109,7 @@ complementNodeParseTest = testGroup "Complement Nodes"
 choiceNodeParseTest :: TestTree
 choiceNodeParseTest = testGroup "Choice Nodes"
     [ regexNodeTestCaseHelper "a|b" [ChoiceNode (sCharNode "a") (sCharNode "b")]
+    , regexNodeTestCaseHelper "a|b|c" [ChoiceNode (sCharNode "a") (ChoiceNode (sCharNode "b") (sCharNode "c"))]
     ,regexNodeTestCaseHelper "(a|b)" [CaptureGroupSequence 1 [ChoiceNode (sCharNode "a") (sCharNode "b")]]
     , regexNodeTestCaseHelper "a|oh" [ChoiceNode (sCharNode "a") (sCharNode "o"), sCharNode "h"]
     , regexNodeTestCaseHelper "ox|z" [sCharNode "o", ChoiceNode (sCharNode "x") (sCharNode "z")]

@@ -114,7 +114,7 @@ choiceNodeParse :: Parser RegexNode
 choiceNodeParse = try $ do
     a <- forwardOnlyNodeParse <?> "a regex node"
     char '|' <?> "a choice symbol"
-    b <- forwardOnlyNodeParse <?> "a regex node"
+    b <- nodeParse <?> "a regex node"
     return $ ChoiceNode a b
 
 --- #### Create a Repetition Node by reading the previous node and then a symbolic repetition symbol
