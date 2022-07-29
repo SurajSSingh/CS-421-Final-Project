@@ -328,6 +328,9 @@ regexUnion (ComplementNode c) x | x == c = wrapNodeInCaptureGroup [everyThingNod
 --- ### DEFAULT: a b = ChoiceNode a b
 regexUnion x y = wrapNodeInCaptureGroup[ChoiceNode x y]
 
+
+
+
 --- ## Regex Node Unify: Take the set intersection of two regex trees.
 ---                      If no unification can occur, then return the empty set 
 ---                      (one of the places where an empty set can be introduced in the program)              
@@ -338,12 +341,14 @@ regexUnify x y
     | x `isSubNode` y = x
     | y `isSubNode` x = y
 --- *** Every Node below is non-equal, non-subsets, non-empty ***
+--- #### Single Group | Single Group -> unify inner1 inner2
+regexUnify (CaptureGroupSequence _ [a]) (CaptureGroupSequence _ [b]) = regexUnify a b
 --- ### Literal & Literal
 --- #### Epsilon & AnyChar -> empty set (any char is only non-empty character)
 --- #### Epsilon & LitChar -> empty set
 --- #### LitChar & AnyChar -> char
-regexUnify (LiteralNode (Left True)) ln@(LiteralNode (Right c)) = ln
-regexUnify ln@(LiteralNode (Right c)) (LiteralNode (Left True)) = ln
+regexUnify (LiteralNode (Left True)) ln@(LiteralNode (Right c)) = wrapNodeInCaptureGroup [ln]
+regexUnify ln@(LiteralNode (Right c)) (LiteralNode (Left True)) = wrapNodeInCaptureGroup [ln]
 --- ### Literal & Choice
 --- #### Epsilon & Choice -> empty set
 --- #### AnyChar & Choice -> 
@@ -363,10 +368,10 @@ regexUnify ln@(LiteralNode (Right c)) (LiteralNode (Left True)) = ln
 --- #### *** double match is equality ***
 --- #### (no match) a|b & c|d -> empty set
 regexUnify (ChoiceNode a b) (ChoiceNode c d)
-    | a == c = a
-    | a == d = a
-    | b == c = b
-    | b == d = b
+    | a == c = wrapNodeInCaptureGroup[a]
+    | a == d = wrapNodeInCaptureGroup[a]
+    | b == c = wrapNodeInCaptureGroup[b]
+    | b == d = wrapNodeInCaptureGroup[b]
     | otherwise = emptySet
 --- ### Choice & Repeat (use distribution)
 --- #### (repeat at most once) a|b & a{s,(x>1)} -> a&a{s,(x>1)} | b&a{s,(x>1)}
@@ -384,9 +389,8 @@ regexUnify (RepetitionNode l s Nothing n) (ChoiceNode a b)
 --- ### Repeat & Repeat 
 --- #### (overlapping, but not strict subset) -> repeat with (either lazy) (max start) (min end) (subset of node1 and node2)
 regexUnify (RepetitionNode l1 s1 e1 n1) (RepetitionNode l2 s2 e2 n2)
-    | n1 == n2 = RepetitionNode (l1 || l2) (max s1 s2) (maybeMin e1 e2) n1
-    | n1 `isSubNode` n2 = RepetitionNode (l1 || l2) (max s1 s2) (maybeMin e1 e2) n1
-    | n2 `isSubNode` n1 = RepetitionNode (l1 || l2) (max s1 s2) (maybeMin e1 e2) n2
+    | n1 `isSubNode` n2 = wrapNodeInCaptureGroup [RepetitionNode (l1 || l2) (max s1 s2) (maybeMin e1 e2) n1]
+    | n2 `isSubNode` n1 = wrapNodeInCaptureGroup [RepetitionNode (l1 || l2) (max s1 s2) (maybeMin e1 e2) n2]
 --- #### otherwise -> empty set
 --- ### Repeat & Group -> empty set
 
@@ -401,28 +405,28 @@ regexUnify (RepetitionNode l1 s1 e1 n1) (RepetitionNode l2 s2 e2 n2)
 --- #### Epsilon not in C -> Epsilon
 regexUnify (ComplementNode c) ln@(LiteralNode (Left False))
     | ln `isSubNode` c = emptySet
-    | otherwise = epsilonNode
+    | otherwise = wrapNodeInCaptureGroup [epsilonNode]
 regexUnify ln@(LiteralNode (Left False)) (ComplementNode c)
     | ln `isSubNode` c = emptySet
-    | otherwise = epsilonNode
+    | otherwise = wrapNodeInCaptureGroup [epsilonNode]
 --- #### AnyChar & Complement 
 --- #### AnyChar in C -> empty set
 --- #### AnyChar not in C -> AnyChar
 regexUnify (ComplementNode c) ln@(LiteralNode (Left True))
     | ln `isSubNode` c = emptySet
-    | otherwise = anyCharNode
+    | otherwise = wrapNodeInCaptureGroup [anyCharNode]
 regexUnify ln@(LiteralNode (Left True)) (ComplementNode c)
     | ln `isSubNode` c = emptySet
-    | otherwise = anyCharNode
+    | otherwise = wrapNodeInCaptureGroup [anyCharNode]
 --- #### LitChar & Complement 
 --- #### LitChar in C -> empty set
 --- #### LitChar not in C -> LitChar
 regexUnify (ComplementNode c) ln@(LiteralNode (Right l))
     | ln `isSubNode` c = emptySet
-    | otherwise = ln
+    | otherwise = wrapNodeInCaptureGroup [ln]
 regexUnify ln@(LiteralNode (Right l)) (ComplementNode c)
     | ln `isSubNode` c = emptySet
-    | otherwise = ln
+    | otherwise = wrapNodeInCaptureGroup [ln]
 --- ### Choice & Complement 
 --- #### both a and b in C -> empty set
 --- #### a in C -> b
@@ -430,29 +434,29 @@ regexUnify ln@(LiteralNode (Right l)) (ComplementNode c)
 --- #### both a and b not in C -> a|b
 regexUnify (ComplementNode c) ch@(ChoiceNode a b)
     | a `isSubNode` c && b `isSubNode` c = emptySet
-    | a `isSubNode` c = b
-    | b `isSubNode` c = a
-    | otherwise = ch
+    | a `isSubNode` c = wrapNodeInCaptureGroup [b]
+    | b `isSubNode` c = wrapNodeInCaptureGroup [a]
+    | otherwise = wrapNodeInCaptureGroup [ch]
 regexUnify ch@(ChoiceNode a b) (ComplementNode c)
     | a `isSubNode` c && b `isSubNode` c = emptySet
-    | a `isSubNode` c = b
-    | b `isSubNode` c = a
-    | otherwise = ch
+    | a `isSubNode` c = wrapNodeInCaptureGroup [b]
+    | b `isSubNode` c = wrapNodeInCaptureGroup [a]
+    | otherwise = wrapNodeInCaptureGroup [ch]
 --- ### Repeat & Complement
 --- #### c == epsilon -> repeat with at least once
 --- #### r in C -> empty set
 --- #### c in R -> R\c
 --- #### c not in R and r not in C -> r
 regexUnify (ComplementNode c) rn@(RepetitionNode l s me r)
-    | c == epsilonNode = RepetitionNode l (max 1 s) me r
+    | c == epsilonNode = wrapNodeInCaptureGroup [RepetitionNode l (max 1 s) me r]
     | r `isSubNode` c = emptySet
     | c `isSubNode` rn = regexUnion epsilonNode (RepetitionNode l (max 2 s) me r)
-    | otherwise = rn
+    | otherwise = wrapNodeInCaptureGroup [rn]
 regexUnify rn@(RepetitionNode l s me r) (ComplementNode c)
-    | c == epsilonNode = RepetitionNode l (max 1 s) me r
+    | c == epsilonNode = wrapNodeInCaptureGroup [RepetitionNode l (max 1 s) me r]
     | r `isSubNode` c = emptySet
     | c `isSubNode` rn = regexUnion epsilonNode (RepetitionNode l (max 2 s) me r)
-    | otherwise = rn
+    | otherwise = wrapNodeInCaptureGroup [rn]
 --- ### Group & Complement 
 --- #### g in C -> empty set
 --- #### g not in C -> g
@@ -465,6 +469,9 @@ regexUnify cgs@(CaptureGroupSequence _ g) (ComplementNode c)
 
 --- ### DEFAULT: empty set
 regexUnify x y = emptySet
+
+
+
 
 
 --- ### NOT IMPLEMENTED SECTION
