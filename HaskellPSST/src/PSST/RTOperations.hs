@@ -1,7 +1,25 @@
 module PSST.RTOperations where
 
-import PSST.Core ( RegexNode (..), epsilonNode, emptySet, isSubNode, wrapNodeInCaptureGroup, everyThingNode, optionalNode, anyCharNode, maybeMax, maybeMin )
+import PSST.Core ( RegexNode (..), epsilonNode, emptySet, wrapNodeInCaptureGroup, everyThingNode, optionalNode, anyCharNode, epsilon, anyChar, maybeLTE, isEmpty )
 
+-- # Regex Node (originally Regex Tree) operations functions
+
+--- ## General Helper Functions
+maybeMin :: Maybe Int -> Maybe Int -> Maybe Int
+maybeMin Nothing Nothing = Nothing
+maybeMin Nothing (Just y) = Just y
+maybeMin (Just x) Nothing = Just x
+maybeMin (Just x) (Just y)
+    | x <= y = Just x
+    | otherwise = Just y
+
+maybeMax :: Maybe Int -> Maybe Int -> Maybe Int
+maybeMax Nothing Nothing = Nothing
+maybeMax Nothing (Just y) = Nothing
+maybeMax (Just x) Nothing = Nothing
+maybeMax (Just x) (Just y)
+    | x >= y = Just x
+    | otherwise = Just y
 
 --- ## Regex Tree Singleton: Does a given regex tree contain only a single valid string 
 ---    These are:
@@ -29,6 +47,96 @@ isNodeSingleton (RepetitionNode _ s Nothing n)
     | n == epsilonNode = True
     | otherwise = False
 isNodeSingleton (CaptureGroupSequence _ n) = all isNodeSingleton n
+
+--- ## isSubNode/isSubset: Is a given node 1 a subnode (language subset) of node 2.
+isSubNode :: RegexNode -> RegexNode -> Bool
+--- ### Logical subnodes
+--- #### Equality is always true
+isSubNode a b | a == b = True
+--- #### Empty set is always subset
+isSubNode (CaptureGroupSequence _ []) n = True
+--- #### Empty set is never superset for non-empty sets
+isSubNode n (CaptureGroupSequence _ []) = isEmpty n
+--- *** All below are non-equal and non-empty ***
+--- ### Group subset Group
+isSubNode (CaptureGroupSequence _ seq1) (CaptureGroupSequence _ seq2) = subNodeAux seq1 seq2
+    where
+        subNodeAux [] [] = True
+        subNodeAux [] bs = False
+        subNodeAux as [] = False
+        subNodeAux (a:as) (b:bs) = a `isSubNode` b && subNodeAux as bs
+--- ### Node subset (Single) Group -> node subset first item
+isSubNode n (CaptureGroupSequence _ [s]) = n `isSubNode` s
+--- ### (Single) Group subset AnyNode -> Group's node subset of Node
+isSubNode (CaptureGroupSequence _ [s]) n = s `isSubNode` n
+--- ### AnyNode subset (Sequence) Group
+--- #### Literal subset (Sequence) Group -> False
+--- #### Choice subset (Sequence) Group -> left side subset of group AND right side subset of group (see Choice section)
+--- #### Repeat subset (Sequence) Group -> 
+
+--- ### (Sequence) Group subset AnyNode
+--- #### Group subset Literal -> False
+--- #### Group subset Choice -> group subset of left OR right side of choice (see Choice section)
+--- #### Group subset Repeat -> Each node in group is subset of repeat node and repeat node's end is bigger than length of sequence
+isSubNode (CaptureGroupSequence _ seq) (RepetitionNode _ _ Nothing r) = all (`isSubNode` r) seq
+isSubNode (CaptureGroupSequence _ seq) (RepetitionNode _ _ (Just end) rn) = subNodeSeqRepAux seq end rn
+    where
+        subNodeSeqRepAux [] _ _ = True
+        subNodeSeqRepAux (x:xs) 0 _ = False
+        subNodeSeqRepAux (x:xs) e n = x `isSubNode` n && subNodeSeqRepAux xs (e-1) n
+
+--- ### AnyNode subset Literal
+--- #### Literal subset Literal
+--- ##### Epsilon subset AnyChar -> False
+--- ##### LitChar subset Epsilon -> False
+--- ##### LitChar subset AnyChar -> True
+isSubNode (LiteralNode a) (LiteralNode b)
+    | a /= epsilon && b == anyChar = True
+--- #### Non-Literal subset Literal (Handled in their own respective sections)
+--- ##### Choice subset Literal -> Both side must be subset of Literal
+--- ##### Repeat subset Literal -> Repeat only once and it's node is subset of Literal
+--- ##### Group subset Literal -> Single sequence group whose node is subset of Literal
+--- ##### Complement subset Literal -> ???
+
+--- ### AnyNode subset Choice -> AnyNode subset of left side OR subset of right side
+--- ### Choice subset AnyNode -> Choice subset of left side AND subset of right side
+isSubNode (ChoiceNode a b) n = a `isSubNode` n && b `isSubNode` n
+isSubNode n (ChoiceNode a b) = n `isSubNode` a || n `isSubNode` b
+
+--- ### Repeat subset Repeat -> If repeat 1's range is inside the range of repeat 2 and repeat 1's node is subset of repeat 2's node
+isSubNode (RepetitionNode l1 s1 Nothing r1) (RepetitionNode l2 s2 Nothing r2)
+    | s1 >= s2 = r1 `isSubNode` r2
+    | otherwise = False
+isSubNode (RepetitionNode l1 s1 (Just e1) r1) (RepetitionNode l2 s2 Nothing r2)
+    | s1 >= s2 = r1 `isSubNode` r2
+    | otherwise = False
+isSubNode (RepetitionNode l1 s1 (Just e1) r1) (RepetitionNode l2 s2 (Just e2) r2)
+    | s1 >= s2 && e1 <= e2 = r1 `isSubNode` r2
+    | otherwise = False
+--- ### AnyNode subset Repeat
+--- #### Epsilon subset Repeat -> True if repeat starts at 0
+isSubNode (LiteralNode (Left False)) (RepetitionNode _ s _ _)
+    | s == 0 = True
+    | otherwise = False
+--- #### Node subset Repeat -> True if repeat starts at most 1 and subset of repeat's node 
+isSubNode n (RepetitionNode _ s me r)
+    | s <= 1 = case me of
+        Just 0 -> False
+        _ -> n `isSubNode` r
+--- ### Repeat subset AnyNode -> True if repeats only once and it's inner node is subset of other node
+isSubNode (RepetitionNode _ 1 (Just 1) r) n = r `isSubNode` n
+
+
+
+--- Complement 1 subset Complement 2 -> True if complement 2's node is subset of complement 1's node
+isSubNode (ComplementNode c1) (ComplementNode c2) = c2 `isSubNode` c1
+--- AnyNode subset Complement -> True if any node is not subset of complement's inner node
+isSubNode n (ComplementNode c) = not $ n `isSubNode` c
+--- Complement subset AnyNode -> ?? 
+
+
+--- ### DEFAULT: False
+isSubNode _ _ = False
 
 
 --- ## Regex Node Union: Take the set union of two regex trees.

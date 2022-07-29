@@ -13,24 +13,6 @@ escapedRegexSymbol :: [String]
 escapedRegexSymbol = ["\\(", "\\)", "\\|", "\\?", "\\*", "\\+", "\\$", "\\."]
 
 
---- ### General Helper Functions
-maybeMin :: Maybe Int -> Maybe Int -> Maybe Int
-maybeMin Nothing Nothing = Nothing
-maybeMin Nothing (Just y) = Just y
-maybeMin (Just x) Nothing = Just x
-maybeMin (Just x) (Just y)
-    | x <= y = Just x
-    | otherwise = Just y
-
-maybeMax :: Maybe Int -> Maybe Int -> Maybe Int
-maybeMax Nothing Nothing = Nothing
-maybeMax Nothing (Just y) = Nothing
-maybeMax (Just x) Nothing = Nothing
-maybeMax (Just x) (Just y)
-    | x >= y = Just x
-    | otherwise = Just y
-
-
 --- ### Environment
 type Env = H.HashMap String [Exp]
 type EvalState a = StateT Env (Except Diagnostic) a
@@ -108,40 +90,15 @@ maybeLTE (Just a) Nothing = True
 maybeLTE Nothing (Just b) = False
 maybeLTE (Just a) (Just b) = a <= b
 
-isSubNode :: RegexNode -> RegexNode -> Bool
-isSubNode a b | a == b = True
-isSubNode (LiteralNode a) (LiteralNode b)
-    | a == b = True
-    | a == Left True && b /= Left False = True
-    | a /= Left False && b == Left True = True
-isSubNode n (ChoiceNode a b) = n `isSubNode` a || n `isSubNode` b
-isSubNode (ChoiceNode a b) n = a `isSubNode` n && b `isSubNode` n
-isSubNode n (ComplementNode c) = not $ n `isSubNode` c
-isSubNode (RepetitionNode _ s1 me1 r1) (RepetitionNode _ s2 me2 r2)
-    | s2 <= s1 && me1 `maybeLTE` me2 = r1 `isSubNode` r2
-isSubNode n (RepetitionNode _ s (Just e) r)
-    | s == 0 && n == epsilonNode = True
-    | e > 0 = n `isSubNode` r
-isSubNode n (RepetitionNode _ s Nothing r)
-    | s < 2 = n `isSubNode` r
-isSubNode n (CaptureGroupSequence _ []) = isEmpty n
-isSubNode (CaptureGroupSequence _ []) n = True
-isSubNode n (CaptureGroupSequence _ [s]) = n `isSubNode` s
-isSubNode _ _ = False
-
--- getCaptureGroup :: Int -> RegexSequence -> RegexSequence
--- getCaptureGroup 0 x = x
--- getCaptureGroup _ [] = []
--- getCaptureGroup n1 [(CaptureGroupSequence n2 r): cgs]
---     | n1 == n2 = r
---     | otherwise = getCaptureGroup n1 cgs
--- getCaptureGroup n [ncg:cgs] = getCaptureGroup n cgs
-
 --- ### Helper Regex Nodes
+epsilon :: Either Bool String
+epsilon = Left False
+anyChar :: Either Bool String
+anyChar = Left True
 epsilonNode :: RegexNode
-epsilonNode = LiteralNode $ Left False
+epsilonNode = LiteralNode epsilon
 anyCharNode :: RegexNode
-anyCharNode = LiteralNode $ Left True
+anyCharNode = LiteralNode anyChar
 everyThingNode :: RegexNode
 everyThingNode = RepetitionNode False 0 Nothing anyCharNode
 -- #### s = single or specific

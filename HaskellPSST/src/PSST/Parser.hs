@@ -2,6 +2,16 @@
 --- ## Adapted from 
 module PSST.Parser (strSolParse, strSolParseRegex) where
 import PSST.Core
+    ( Exp(..),
+      RegexNode(..),
+      epsilonNode,
+      anyCharNode,
+      sCharNode,
+      kleeneStarNode,
+      kleenePlusNode,
+      optionalNode,
+      captureGroupStub,
+      wrapNodeInCaptureGroup )
 
 import Data.Functor.Identity
 import Text.ParserCombinators.Parsec hiding (Parser, State)

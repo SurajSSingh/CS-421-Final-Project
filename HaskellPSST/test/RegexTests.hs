@@ -4,8 +4,8 @@ import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.HUnit (testCase, (@?=), Assertion)
 import PSST.Parser (strSolParseRegex)
 import qualified Text.Parsec as Text.Parsec.Error
-import PSST.Core (RegexNode (CaptureGroupSequence), emptySet, isSubNode)
-import PSST.RTOperations (isNodeSingleton, regexUnify, regexUnion)
+import PSST.Core (RegexNode (CaptureGroupSequence), emptySet)
+import PSST.RTOperations (isNodeSingleton, regexUnify, regexUnion, isSubNode)
 
 regexNodeGenerator :: String -> RegexNode
 regexNodeGenerator regexStr = case strSolParseRegex ("\"" ++ regexStr ++ "\"") of
@@ -59,12 +59,31 @@ regexSubNodeEqualityTests = testGroup "Regex Equal value Sub-Nodes Tests"
     [ subnodeTestHelper "a" "a" True
     , subnodeTestHelper "" "" True
     , subnodeTestHelper "." "." True
+    , subnodeTestHelper "(a)." "(a)." True
+    , subnodeTestHelper "a*" "a*" True
+    , subnodeTestHelper "a?" "a?" True
+    , subnodeTestHelper "a+" "a+" True
+    , subnodeTestHelper "a{1,2}" "a{1,2}" True
+    , subnodeTestHelper "abc" "abc" True
+    , subnodeTestHelper "abc" "(abc)" True
     ]
 
 regexSubNodeTrueTests :: TestTree
 regexSubNodeTrueTests = testGroup "Regex True Sub-Nodes Tests"
     [ subnodeTestHelper "a" "." True
-    , subnodeTestHelper "" ".*" True
+    , subnodeTestHelper "" "a*" True
+    , subnodeTestHelper "a" "a+" True
+    , subnodeTestHelper "" "a?" True
+    , subnodeTestHelper "a" "a?" True
+    , subnodeTestHelper "a" "a|b" True
+    , subnodeTestHelper "a" "(a*)|b" True
+    , subnodeTestHelper "" "(a?)|b" True
+    , subnodeTestHelper "abc" "(abc)|(xyz)" True
+    , subnodeTestHelper "abc" "(abc)*" True
+    , subnodeTestHelper "a{10,100}" "a*" True
+    , subnodeTestHelper "a{10,100}" "a{5,500}" True
+    , subnodeTestHelper "a{10,}" "a*" True
+    , subnodeTestHelper "a{10,}" "a{5,}" True
     ]
 
 regexSubNodeFalseTests :: TestTree
