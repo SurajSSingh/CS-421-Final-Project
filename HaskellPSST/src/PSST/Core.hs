@@ -36,21 +36,61 @@ data RegexNode = LiteralNode (Either Bool String)
                deriving (
             --    Eq 
             --    , 
-            --    Show
+               Show
                )
 
 instance Eq RegexNode where
     -- Regular (mostly derived) Equality
     LiteralNode a == LiteralNode b = a == b
     ComplementNode a == ComplementNode b = a == b
+    --- Choice Node Equality currently hard coded since I have no idea how to allow symmetry 
+    ChoiceNode a@(ChoiceNode a1 a2) b@(ChoiceNode b1 b2) == ChoiceNode c@(ChoiceNode c1 c2) d@(ChoiceNode d1 d2)
+        | a1 == c1 && a2 == c2 && b1 == d1 && b2 == d2 = True
+        | a1 == c1 && a2 == c2 && b1 == d2 && b2 == d1 = True
+        | a1 == c1 && a2 == d1 && b1 == c2 && b2 == d2 = True
+        | a1 == c1 && a2 == d1 && b1 == d2 && b2 == c2 = True
+        | a1 == c1 && a2 == d2 && b1 == c2 && b2 == d1 = True
+        | a1 == c1 && a2 == d2 && b1 == d1 && b2 == c2 = True
+        
+        | a1 == c2 && a2 == c1 && b1 == d1 && b2 == d2 = True
+        | a1 == c2 && a2 == c1 && b1 == d2 && b2 == d1 = True
+        | a1 == c2 && a2 == d1 && b1 == c1 && b2 == d2 = True
+        | a1 == c2 && a2 == d1 && b1 == d2 && b2 == c1 = True
+        | a1 == c2 && a2 == d2 && b1 == c1 && b2 == d1 = True
+        | a1 == c2 && a2 == d2 && b1 == d1 && b2 == c1 = True
+        
+        | a1 == d1 && a2 == c2 && b1 == c1 && b2 == d2 = True
+        | a1 == d1 && a2 == c2 && b1 == d2 && b2 == c1 = True
+        | a1 == d1 && a2 == c1 && b1 == c2 && b2 == d2 = True
+        | a1 == d1 && a2 == c1 && b1 == d2 && b2 == c2 = True
+        | a1 == d1 && a2 == d2 && b1 == c2 && b2 == c1 = True
+        | a1 == d1 && a2 == d2 && b1 == c1 && b2 == c2 = True
+        
+        | a1 == d2 && a2 == c2 && b1 == d1 && b2 == c1 = True
+        | a1 == d2 && a2 == c2 && b1 == c1 && b2 == d1 = True
+        | a1 == d2 && a2 == d1 && b1 == c2 && b2 == c1 = True
+        | a1 == d2 && a2 == d1 && b1 == c1 && b2 == c2 = True
+        | a1 == d2 && a2 == c1 && b1 == c2 && b2 == d1 = True
+        | a1 == d2 && a2 == c1 && b1 == d1 && b2 == c2 = True
+
+    ChoiceNode a b@(ChoiceNode b1 b2) == ChoiceNode c@(ChoiceNode c1 c2) d
+        | a == c1 && b1 == c2 && b2 == d = True
+        | a == c1 && b1 == d && b2 == c2 = True
+        | a == c2 && b1 == c1 && b2 == d = True
+        | a == c2 && b1 == d && b2 == c1 = True
+        | a == d && b1 == c1 && b2 == c2 = True
+        | a == d && b1 == c2 && b2 == c1 = True
+    ChoiceNode a b@(ChoiceNode b1 b2) == ChoiceNode c d@(ChoiceNode d1 d2) = ChoiceNode a b == ChoiceNode d c
+    ChoiceNode a@(ChoiceNode a1 a2) b == ChoiceNode c@(ChoiceNode c1 c2) d = ChoiceNode b a == ChoiceNode c d
+    ChoiceNode a@(ChoiceNode a1 a2) b == ChoiceNode c d@(ChoiceNode d1 d2) = ChoiceNode b a == ChoiceNode d c
     ChoiceNode a b == ChoiceNode c d
         | a == c && b == d = True
         | a == d && b == c = True
     RepetitionNode l1 s1 e1 n1 == RepetitionNode l2 s2 e2 n2 = l1 == l2 && s1 == s2 && e1 == e2 && n1 == n2
     CaptureGroupSequence _ a == CaptureGroupSequence _ b = a == b
     -- Special Generic Equality
-    CaptureGroupSequence _ [a] == b = a == b
-    a == CaptureGroupSequence _ [b] = a == b
+    -- CaptureGroupSequence _ [a] == b = a == b
+    -- a == CaptureGroupSequence _ [b] = a == b
     ComplementNode (ComplementNode a) == b = a == b
     a == ComplementNode (ComplementNode b) = a == b
     -- Other special cases
@@ -61,27 +101,27 @@ instance Eq RegexNode where
     a == b = False
 
 
-instance Show RegexNode where
-    show (LiteralNode (Left False)) = "''"
-    show (LiteralNode (Left True)) = "."
-    show (LiteralNode (Right c)) = c
-    show (ComplementNode n) = "~" ++ show n
-    show (ChoiceNode a b) = show a ++ "|" ++ show b
-    show (RepetitionNode l s e n) = show n ++ rangeStr ++ isLazyStr
-        where
-            isLazyStr = if l then "?" else ""
-            rangeStr = case (s, e) of
-                (start, Just end)
-                    | end == 1     -> "?"
-                    | start == end -> "{" ++ show start ++ "}"
-                    | otherwise    -> "{" ++ show start ++ "," ++ show end ++ "}"
-                (0, Nothing)       -> "*"
-                (1, Nothing)       -> "+"
-                (start, Nothing)   -> "{" ++ show start ++ ",}"
-    show (CaptureGroupSequence num seq) = "<$" ++ groupNum ++ ">" ++ "(" ++ seqStr ++ ")"
-        where
-            groupNum = show $ abs num
-            seqStr = intercalate "" (Prelude.map show seq)
+-- instance Show RegexNode where
+--     show (LiteralNode (Left False)) = "''"
+--     show (LiteralNode (Left True)) = "."
+--     show (LiteralNode (Right c)) = c
+--     show (ComplementNode n) = "~" ++ show n
+--     show (ChoiceNode a b) = show a ++ "|" ++ show b
+--     show (RepetitionNode l s e n) = show n ++ rangeStr ++ isLazyStr
+--         where
+--             isLazyStr = if l then "?" else ""
+--             rangeStr = case (s, e) of
+--                 (start, Just end)
+--                     | end == 1     -> "?"
+--                     | start == end -> "{" ++ show start ++ "}"
+--                     | otherwise    -> "{" ++ show start ++ "," ++ show end ++ "}"
+--                 (0, Nothing)       -> "*"
+--                 (1, Nothing)       -> "+"
+--                 (start, Nothing)   -> "{" ++ show start ++ ",}"
+--     show (CaptureGroupSequence num seq) = "<$" ++ groupNum ++ ">" ++ "(" ++ seqStr ++ ")"
+--         where
+--             groupNum = show $ abs num
+--             seqStr = intercalate "" (Prelude.map show seq)
 
 --- Nothing in this specific case means Infinity
 maybeLTE :: Maybe Int -> Maybe Int -> Bool
@@ -150,6 +190,16 @@ renumberCaptureGroup num (ln@(LiteralNode _):ns) = (finNum, ln : newNs)
 wrapNodeInCaptureGroup :: RegexSequence -> RegexNode
 -- wrapNodeInCaptureGroup [CaptureGroupSequence num node] = CaptureGroupSequence 0 $ snd $ renumberCaptureGroup 1 node
 wrapNodeInCaptureGroup n = CaptureGroupSequence 0 $ snd $ renumberCaptureGroup 1 n
+
+hasEpsilonTransition :: RegexNode -> Bool
+hasEpsilonTransition (LiteralNode (Left False)) = True
+hasEpsilonTransition (ComplementNode c) = not $ hasEpsilonTransition c
+hasEpsilonTransition (ChoiceNode a b) = hasEpsilonTransition a || hasEpsilonTransition b
+hasEpsilonTransition (RepetitionNode _ 0 _ _) = True
+hasEpsilonTransition (RepetitionNode _ _ _ n) = hasEpsilonTransition n
+hasEpsilonTransition (CaptureGroupSequence _ []) = False
+hasEpsilonTransition (CaptureGroupSequence _ seq) = all hasEpsilonTransition seq
+hasEpsilonTransition n = False
 
 --- ### Expressions
 data Exp = IntExp Int

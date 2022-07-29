@@ -65,7 +65,10 @@ regexSubNodeEqualityTests = testGroup "Regex Equal value Sub-Nodes Tests"
     , subnodeTestHelper "a+" "a+" True
     , subnodeTestHelper "a{1,2}" "a{1,2}" True
     , subnodeTestHelper "abc" "abc" True
+    , subnodeTestHelper "a." "(a)." True
+    , subnodeTestHelper "(a)." "a." True
     , subnodeTestHelper "abc" "(abc)" True
+    , subnodeTestHelper "(abc)" "abc" True
     ]
 
 regexSubNodeTrueTests :: TestTree
@@ -75,11 +78,14 @@ regexSubNodeTrueTests = testGroup "Regex True Sub-Nodes Tests"
     , subnodeTestHelper "a" "a+" True
     , subnodeTestHelper "" "a?" True
     , subnodeTestHelper "a" "a?" True
+    , subnodeTestHelper "a?" "a*" True
+    , subnodeTestHelper "a+" "a*" True
     , subnodeTestHelper "a" "a|b" True
     , subnodeTestHelper "a" "(a*)|b" True
     , subnodeTestHelper "" "(a?)|b" True
     , subnodeTestHelper "abc" "(abc)|(xyz)" True
-    , subnodeTestHelper "abc" "(abc)*" True
+    , subnodeTestHelper "abc+" "abc*" True
+    , subnodeTestHelper "(ab)" "(ab)*" True
     , subnodeTestHelper "a{10,100}" "a*" True
     , subnodeTestHelper "a{10,100}" "a{5,500}" True
     , subnodeTestHelper "a{10,}" "a*" True
@@ -90,6 +96,10 @@ regexSubNodeFalseTests :: TestTree
 regexSubNodeFalseTests = testGroup "Regex Not Sub-Nodes Tests"
     [ subnodeTestHelper "." "a" False
     , subnodeTestHelper "" "a" False
+    , subnodeTestHelper "abc*" "abc+" False
+    , subnodeTestHelper "a?" "a+" False
+    , subnodeTestHelper "a{10,20}" "a{5,10}" False
+    , subnodeTestHelper "a{10,20}" "a{15,20}" False
     ]
 
 regexUnionTests :: TestTree
@@ -97,12 +107,17 @@ regexUnionTests = testGroup "Regex Union Tests"
     [ unionOpHelper "a" "a" "a"
     , unionOpHelper "a" "b" "a|b"
     , unionOpHelper "a" "" "a?"
-    , unionOpHelper "a|b" "c|d" "(a|b)|(c|d)"
+    , unionOpHelper "a|b" "a|b" "a|b"
+    , unionOpHelper "a|b" "a|c" "a|b|c"
+    , unionOpHelper "a|c" "a|b" "a|b|c"
+    , unionOpHelper "a|b" "c|d" "a|b|c|d"
     , unionOpHelper "a" "a?" "a?"
     , unionOpHelper "a" "a??" "a??"
     , unionOpHelper "a+" "a*" "a*"
-    , unionOpHelper "a+" "a?" "a+"
+    , unionOpHelper "a+" "a?" "a*"
     , unionOpHelper "a?" "a*" "a*"
+    , unionOpHelper "a|b" "c" "a|b|c"
+    , unionOpHelper "a|b" "b*" "a|b*"
     ]
 
 regexUnifyTests :: TestTree

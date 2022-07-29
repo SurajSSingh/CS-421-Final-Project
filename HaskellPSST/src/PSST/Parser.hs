@@ -144,7 +144,15 @@ curlyRepetitionNodeParse = try $ do
       -- Exact repetition
       Nothing -> return $ RepetitionNode (isJust l) x (Just x) n
       -- Bounded repetition
-      Just _ -> return $ RepetitionNode (isJust l) x y n
+      Just _ -> case y of 
+        -- End is infinite
+        Nothing -> return $ RepetitionNode (isJust l) x y n
+        -- End is finite, if end is smaller than start...
+        Just i -> if i < x 
+            -- invert start and end order
+            then return $ RepetitionNode (isJust l) i (Just x) n
+            -- otherwise, keep start and end order 
+            else return $ RepetitionNode (isJust l) x y n
 
 --- #### Create a Capture Group Sequence by reading an opening parentheses, then reading multiple nodes, and finally a closing parentheses
 captureGroupParse :: Parser RegexNode
