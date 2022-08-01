@@ -150,7 +150,8 @@ emptySet = CaptureGroupSequence 0 []
 nullNode :: RegexNode
 nullNode = emptySet
 isEmpty :: RegexNode -> Bool
-isEmpty n = n == emptySet
+isEmpty (CaptureGroupSequence _ []) = True
+isEmpty n = False
 
 --- Helper Functions
 renumberCaptureGroup :: Int -> RegexSequence -> (Int, RegexSequence)

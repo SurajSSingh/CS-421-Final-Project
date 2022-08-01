@@ -34,8 +34,18 @@ getRegexFromExp _ = everyThingNode
 concatOp :: Exp -> Maybe Exp -> Maybe Exp -> EvalState Exp
 concatOp e1 (Just e2) (Just e3) = throwError $ NumOfArgumentsError "Concat" 2 3 [show e1, show e2, show e3]
 concatOp e1 Nothing Nothing = throwError $ NumOfArgumentsError "Concat" 2 1 [show e1]
+-- Multiple Concat, evaluate inner then outer
+concatOp e1 (Just (OperatorExp "concat" e2 me3 Nothing)) Nothing = do
+  c1 <- concatOp e2 me3 Nothing
+  return $ OperatorExp "concat" e1 (Just c1) Nothing
+-- Concat anything with variable(s), leave alone
 concatOp exp1@(VarExp var1) (Just exp2@(VarExp var2)) Nothing = do
   return $ OperatorExp "concat" exp1 (Just exp2) Nothing
+concatOp exp1@(RegexExp re1) (Just exp2@(VarExp var2)) Nothing = do
+    return $ OperatorExp "concat" exp1 (Just exp2) Nothing
+concatOp exp1@(VarExp var1) (Just exp2@(RegexExp re2)) Nothing = do
+  return $ OperatorExp "concat" exp1 (Just exp2) Nothing
+-- Concat regex, put them into a new sequence
 concatOp (RegexExp re1) (Just (RegexExp re2)) Nothing = do
   return $ RegexExp $ wrapNodeInCaptureGroup [re1, re2]
 concatOp e1 e2 e3 = throwError $ InvalidArgumentsError "Concat" [show e1, show e2, show e3]
@@ -129,7 +139,7 @@ checkOp (Just (VarExp v)) env = case H.lookup v env of
       regex = Prelude.map getRegexFromExp regexExp
       finalResult = case regex of
         [] -> True --- Variable can assume that the "free" variables are always valid
-        exp : exps' -> isEmpty (Data.List.foldr regexUnify exp exps')
+        exp : exps' -> not $ isEmpty (Data.List.foldr regexUnify exp exps')
     in 
     do
       return $ ResultValExp $ show finalResult
