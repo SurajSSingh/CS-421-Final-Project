@@ -138,7 +138,8 @@ This module houses all the main regex tree operations as well as some helper fun
 \end{itemize}
 
 \subsection{Parser module}\label{code:parse}
-The parser uses Parsec combinator parsing library to .
+The parser uses Parsec combinator parsing library to parse a given line into either an expression or returns a parse error. 
+There is also a separate regex string parser, which specifically makes it easy to test the $Regex Nodes$. 
 
 \subsection{Evaluator module}\label{code:eval}
 The evaluator module defines the location for evaluating expression received after parsing. There are 3 encompassing data types and function:
@@ -156,7 +157,11 @@ The other helper function are used to pull out specific components from the REPL
 
 \section{Tests}\label{sec:tests}
 %%% Coming up with appropriate tests is one of the most important part of  good software development. Your tests should include unit tests, feature  tests, and larger test codes. Give a short description of the tests  used, performance results if appropriate (e.g., memory consumption for  garbage collection) etc. Be sure to explain how these tests exercise the  concept(s) you've implemented.
-There are three helper files for the tests.
+For the tests, the main test file is Spec.hs and there three helper files for the actual test. 
+First, there is the ParserTest module, which runs tests on the parser, as well as parsing regex strings. 
+Second is the RegexTest module, that checks all the regex operations of singleton, subset, union, and unify.
+The last is the EvalTest module, handles checking evaluation of expressions.
+Since I worked in a test-driven development format, all tests currently written pass, but there are likely more tests that need to written for testing non-working aspects of the code.
 
 \bibliography{main}
 
