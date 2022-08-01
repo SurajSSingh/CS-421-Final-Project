@@ -2,7 +2,7 @@
 \usepackage[utf8]{inputenc}
 \usepackage{mathptmx}
 \usepackage{natbib}
-\usepackage[top=1in, bottom=1.25in, left=1.25in, right=1.25in]{geometry}
+\usepackage[top=1in, bottom=1in, left=1in, right=1in]{geometry}
 \usepackage{enumitem}
 \usepackage[usenames,dvipsnames]{xcolor}
 \usepackage{hyperref}
@@ -18,6 +18,7 @@
 \usepackage{microtype}
 \usepackage[ragged]{footmisc}
 \usepackage{listings}
+\bibliographystyle{plainnat}
 
 \title{CS 421: Final Report}
 \author{Suraj Singh \\ NetId: surajss2 }
@@ -30,28 +31,34 @@
 \section{Overview}\label{sec:overview}
 %%% Describe the motivation, goals, and broad accomplishments of your project in general terms.
 \subsection{Motivation}\label{sec:motivation}
-My primary motivation was to start creating a programming language that can treat Regex strings like types.
-Regular expressions provide a compact way of representing a set (which potentially could be infinite) of accepting string.
+My primary motivation was to start creating a programming language that can treat regular expression strings as sets.
+Regular expressions (also known as Regex) provide a compact way of representing a set of accepting strings, which potentially could be infinite.
 In theory, these accepted strings could be thought of as possible values for a variable, much like types.
-The key idea this affords us is that we might be able to use regex values to hold properties about some variable.
-While, obviously, I could not implement the whole language within a month, I could at least focus this project on trying to get the Regex strings and operations working.
+The key idea this affords us is that we might be able to use regex values to hold properties about some variables.
+It also makes serializing and deserializing values fairly trivial, as regex values define the exact format of the data type they contain.
+While, obviously, I could not implement the whole language within a month, I could at least focus this project on trying to get the Regex strings and some operations working.
+As a starting point, I referenced the paper `Solving String Constraints with Regex-Dependent Functions through Transducers with Priorities and Variables' by \Citealp{Solving}.
 
 \subsection{Goals}\label{sec:goals}
 My goal was to create a programming language that can store and operate on regex values.
-
-This required adding . 
-The idea from the original paper posited the idea of 
-
-While my initial proposal 
+Originally, my plan was to implement something similar to the string solving calculus from page 19 of \Citealp{Solving}.
+However, I ran into some issued with parsing and representing the regex strings within the program that slowed down my ambition for this.
+To at least accomplish a subset of the original goal, I focused on implementing the set operation functions on the regex strings, primarily set intersection, set union, subset relation, and singleton predicate.
+This way, the tools for performing the calculus would be in-place and could still be performed manually. 
 
 \subsection{Broad Accomplishments}\label{sec:accomplications}
-I was able to complete the general REPL of the language, add a mechanism for assigning variables to regex strings and other variables, and added some functions to process regex string such as getting the union and intersection. 
+For the program, I was able to create a working parser and evaluator that is able to read regex strings and variables, and then perform operations on them.
+The operations include: concatenation, subset test, singleton test, regex union, regex unify (intersection), and single variable checking.
+This was all wrapped into a Read-Eval-Print-Loop (REPL) shell that can be accessed by running `main' from GHCI, and includes passing tests for the parser, regex operators, and evaluator. 
 
 
 \section{Implementation}\label{sec:impl}
 %%%A brief description of the important aspects of your implementation, in  terms of (a) the major tasks or capabilities of your code; (b)  components of the code; (d) status of the project – what works well,  what works partially, and and what is not implemented at all. You MUST  compare these with your original proposed goals in the project proposal.
 
 \subsection{Capabilities}\label{sec:capabilities}
+Currently, you are able to create regex string and perform certain operations on them, namely: set union, set intersection (unify), singleton check, subset check, concatenation, and variable assignment.
+Variable can be created and assigned to multiple regex string, as well as other variables. 
+The program can also run a `check'/`solve' command on a single variable, which will attempt to see if the set of values are compatible with each other (i.e. is a possible set of valid strings non-empty). 
 
 \subsection{Components}\label{sec:components}
 There are 5 main modules created for this project, which are:
@@ -62,35 +69,70 @@ There are 5 main modules created for this project, which are:
     \item Evaluator: Processes the expression and evaluates the result
     \item Runtime: Handles the read, print, and loop section of the REPL
 \end{enumerate}
+Supporting this, there is also the Main.hs file, which primarily handles running the REPL and a set of test files which tests the capabilities of the program.
+A more detailed description of all of these components will be provided in Sections \ref*{sec:code} and \ref*{sec:tests}.
 
 \subsection{What Works Well}\label{sec:working}
-The REPL system works well.
-
-I also feel good about the Regex Node data type I implemented for storing regex values.
+The core implementation of the regex node data structure works wells with the current system I have in place.
+The use of the tree structure allows me to more easily visualize the structure of the regex, particularly the capture group.
+There is also the added benefit of pulling together common structure (such as literal characters and repetition) into a single data constructor, reducing the number of pattern matches needed when developing the regex functions. 
+Also, the singleton functionality work perfectly well and was one of the easier functions to implement and test.
 
 \subsection{What Works Partially}\label{sec:partially}
 The Parser to Regex Node works correctly, though the semantics is very different from other regex implementations.
 It technically should be able to represent any regex string, but at the current cost of require lots of explicit parentheses.
-Every operator I have implemented for the regex syntax (such as `*', `+', `?', `|', etc.) is tried one at a time and parses only a single character around the operator.
-For example, when I provide the regex `ax|by', this gets translated as the set {`axy', `aby'} instead of {`ax', `by'} since the choice operator only check the preceding and next node.
-To get the set {`ax', `by'}, one would have to do `(ax)|(by)', which parses the inner capture groups first, and then the choice.
-This also means a regex like `a?|b*' would fail to parse, since the `|' would look at `?' and `b', which doesn't make sense for my current parser.
+Every operator I have implemented for the regex syntax (such as `*', `+', `?', `$|$', etc.) is tried one at a time and parses only a single character around the operator.
+For example, when I provide the regex `ax$|$by', this gets translated as the set {`axy', `aby'} instead of {`ax', `by'} since the choice operator only check the preceding and next characters.
+To get the set {`ax', `by'}, one would have to do `(ax)$|$(by)', which parses the inner capture groups first, and then the choice.
+This also means a regex like `a?|b*' would fail to parse, since the `$|$' would look at `?' and `b', which doesn't make sense for the current parser.
 To get the appropriate mean, one would have to add parentheses like so: `(a?)|(b*)'.
-With more time, I would have looked into Parsec's `Expr' module for better parsing.
+With more time, I would have looked into using Parsec's `Expr' module or something similar for better parsing.
+
+Additionally, the `solve'/`check' operations only work for single variables.
+What this means is that it only looks at a single variable and tries to determine if there exist some non-empty string language.
+This is accomplished by unifying all pure regex strings, as well as operations on those regex strings.
+Other variables used are treated as free-variables and are assumed to be valid.
+Variables used within the checking variable (such as $x = y + z$) are also assumed to be valid, since every variable in a non-empty set can either be assigned directly from the set or be set to epsilon.
+
+As for the regex set operations such as subset (sub-node), unify (intersection) and union, I have added some small-case tests which all seem to work, however, there may still be many edge cases that are not fully accounted for yet.
+I will need to add more tests to verify that even complex patterns work correctly.
 
 \subsection{What's Not Implemented}\label{sec:not_impl}
 
-I could not finish the \lstinline{extract}, \lstinline{replace}, and \lstinline{replaceAll} functions. 
-These functions primarily .
+I could not finish the \lstinline{extract}, \lstinline{replace}, and \lstinline{replaceAll} functions that were specified in the language from the paper. 
+These functions primarily handle processing and transforming regex strings, so while important for the string solver, I wanted to make sure the regex set operations were in working order before I started on those functions.
 
 I also ran out of time to implement the actual solver calculus from paper.
+However, since the operations used within the solver, such as intersection and union, are included in one degree or another, one can manually run the solver and at least check that it work that way.
 
+\section{Code Overview}\label{sec:code}
+%%%  A listing of your code. The code should be documented thoroughly and  clearly. You don't need to comment every single line or even every  single function. Instead, focus on the central functions and data  structures in your implementation, and document them well.
+This section will go over the high-level aspects of the 5 main modules described from Section \ref*{sec:components}.
+\subsection{Core module}\label{code:core}
+This module is primarily dedicated to the data structures and helper functions used throughout the rest of the program.
+
+\subsection{RTOperations module}\label{code:rtops}
+
+
+\subsection{Parser module}\label{code:parse}
+
+
+\subsection{Evaluator module}\label{code:eval}
+
+
+\subsection{Runtime module}\label{code:runtime}
+The runtime module is primarily used to glue together all the previous parts into a single .
 
 \section{Tests}\label{sec:tests}
 %%% Coming up with appropriate tests is one of the most important part of  good software development. Your tests should include unit tests, feature  tests, and larger test codes. Give a short description of the tests  used, performance results if appropriate (e.g., memory consumption for  garbage collection) etc. Be sure to explain how these tests exercise the  concept(s) you've implemented.
+\subsection{Parser Tests}\label{test:parser}
+These tests focus on parsing strings and converting them into Regex Nodes and Expressions. 
 
+\subsection{Regex Operations Tests}\label{test:regex}
+These tests focus on specific operations on regular expression.
 
-\section{Listing}\label{sec:code}
-%%%  A listing of your code. The code should be documented thoroughly and  clearly. You don't need to comment every single line or even every  single function. Instead, focus on the central functions and data  structures in your implementation, and document them well.
+\subsection{Evaluator Tests}\label{test:eval}
+
+\bibliography{main}
 
 \end{document}

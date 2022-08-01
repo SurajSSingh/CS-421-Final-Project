@@ -233,7 +233,14 @@ data Diagnostic = UnimplementedError String
                 | InvalidArgumentsError String [String]
                 | NumOfArgumentsError String Int Int [String]
                 | VariableNotFoundError String
-                deriving (Eq)
+
+instance Eq Diagnostic where
+    UnimplementedError x == UnimplementedError y = True
+    InvalidOperationError op1 == InvalidOperationError op2 = op1 == op2
+    InvalidArgumentsError op1 x == InvalidArgumentsError op2 y = op1 == op2
+    NumOfArgumentsError op1 expect1 given1 x  == NumOfArgumentsError op2 expect2 given2 y = op1 == op2 && expect1 == expect2 && given1 == given2
+    VariableNotFoundError v1 == VariableNotFoundError v2 = v1 == v2
+    x == y = False
 
 instance Show Diagnostic where
     show (UnimplementedError x) = x ++ " Unimplemented"

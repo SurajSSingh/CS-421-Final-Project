@@ -1,4 +1,4 @@
-module PSST.Evaluator (eval) where
+module PSST.Evaluator where
 
 import PSST.Core
 import PSST.RTOperations
@@ -7,12 +7,29 @@ import Control.Monad.State
 import Control.Monad.Except
 import Data.List
 import Data.HashMap.Strict
+import Data.Maybe
 
 orgStrVarWithExprs :: (String, [Exp]) -> String
 orgStrVarWithExprs (var, exps) =  intercalate "\n" (Prelude.map (\e -> var ++ " = " ++ show e) exps)
 
 orgStrVars :: HashMap String [Exp] -> [Char]
 orgStrVars env = intercalate "\n\n" $ Prelude.map orgStrVarWithExprs (toList env)
+
+isAllRegex :: Exp -> Bool
+isAllRegex (IntExp i) = False
+isAllRegex (RegexExp s) = True
+isAllRegex (VarExp v) = False
+isAllRegex (ResultValExp r) = False
+isAllRegex (AssignmentExp var val) = False
+isAllRegex (StateOpExp op mv) = False
+isAllRegex (OperatorExp op e1 Nothing Nothing) = isAllRegex e1
+isAllRegex (OperatorExp op e1 (Just e2) Nothing) = isAllRegex e1 && isAllRegex e2
+isAllRegex (OperatorExp op e1 Nothing (Just e3)) = isAllRegex e1 && isAllRegex e3
+isAllRegex (OperatorExp op e1 (Just e2) (Just e3)) = isAllRegex e1 && isAllRegex e2 && isAllRegex e3
+
+getRegexFromExp :: Exp -> RegexNode
+getRegexFromExp (RegexExp node) = node
+getRegexFromExp _ = everyThingNode
 
 concatOp :: Exp -> Maybe Exp -> Maybe Exp -> EvalState Exp
 concatOp e1 (Just e2) (Just e3) = throwError $ NumOfArgumentsError "Concat" 2 3 [show e1, show e2, show e3]
@@ -103,10 +120,29 @@ subsetOp (RegexExp re1) e2 Nothing = throwError $ InvalidArgumentsError "Subset"
 subsetOp e1 e2 Nothing = throwError $ InvalidArgumentsError "Subset" ["First expression is not valid regex: " ++ show e1]
 
 checkOp:: Maybe Exp -> HashMap String [Exp] -> EvalState Exp
-checkOp var env = unimplemented "Check/Solve Operation"
+-- Single Variable Checking
+checkOp (Just (VarExp v)) env = case H.lookup v env of
+  Nothing -> throwError $ VariableNotFoundError v
+  Just exps -> 
+    let 
+      (regexExp, otherExp) = partition isAllRegex exps
+      regex = Prelude.map getRegexFromExp regexExp
+      finalResult = case regex of
+        [] -> True --- Variable can assume that the "free" variables are always valid
+        exp : exps' -> isEmpty (Data.List.foldr regexUnify exp exps')
+    in 
+    do
+      return $ ResultValExp $ show finalResult
+checkOp (Just exp) env = throwError $ InvalidArgumentsError "Check" [show exp]
+-- Solve entire environment
+checkOp Nothing env = unimplemented "Check/Solve Operation"
 
 stateOp:: Maybe Exp -> HashMap String [Exp] -> EvalState Exp
-stateOp var env = return $ ResultValExp $ "\n" ++ orgStrVars env ++ "\n\n"
+stateOp (Just (VarExp v)) env = case H.lookup v env of
+  Nothing -> throwError $ VariableNotFoundError v
+  Just exps -> return $ ResultValExp $ orgStrVarWithExprs (v, exps)
+stateOp (Just exp) env = throwError $ InvalidArgumentsError "State" [show exp]
+stateOp Nothing env = return $ ResultValExp $ "\n" ++ orgStrVars env ++ "\n\n"
 
 clearOp :: Maybe Exp -> HashMap String [Exp] -> EvalState Exp
 clearOp var env = do
@@ -158,7 +194,7 @@ eval (VarExp var) = do
 --- ### AssignmentExp expressions --> modify the environment with variable and value
 eval (AssignmentExp var val) = do
     modify $ mapListAdd var val
-    return $ ResultValExp $ "Added Assignment: " ++ var ++ " to " ++ show val
+    return $ ResultValExp $ "Added Assignment: " ++ var ++ " = " ++ show val
 
 --- ### Expression Operations --> operation done without needing state
 eval (OperatorExp op e1 me2 me3) = case H.lookup op expOperations of
