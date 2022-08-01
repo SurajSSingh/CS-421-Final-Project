@@ -124,10 +124,12 @@ regexUnifyTests :: TestTree
 regexUnifyTests = testGroup "Regex Unify Tests"
     [ unifyOpHelper "a" "a" $ Just "a"
     , unifyOpHelper "a" "b" Nothing
+    , unifyOpHelper "a?" "b?" Nothing
     , unifyOpHelper "a" "a?" $ Just "a"
     , unifyOpHelper "a" "a??" $ Just "a"
     , unifyOpHelper "a+" "a*" $ Just "a+"
     , unifyOpHelper "a+" "a?" $ Just "a{1}"
     , unifyOpHelper "a?" "a*" $ Just "a?"
     , unifyOpHelper "a|b" "b|a" $ Just "a|b"
+    , unifyOpHelper "a" "(a)" $ Just "a"
     ]

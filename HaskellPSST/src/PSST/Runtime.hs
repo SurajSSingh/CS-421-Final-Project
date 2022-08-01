@@ -57,9 +57,10 @@ helpText = ["Welcome to String Solver"
             , "Operators:"
             , "  * Assignment: "
             , "  * Concatenation: "
-            , "  * Unify: "
-            , "  * Union: "
-            , "  * U: "
+            , "  * Unify (n:): "
+            , "  * Union (u:): "
+            , "  * Singleton (:S): "
+            , "  * Subset (:s): "
             ]
 
 repl :: IO () -> Env -> IO ()

@@ -7,4 +7,4 @@ main :: IO ()
 main = defaultMain tests
 
 tests :: TestTree
-tests = testGroup "Tests" [parserTests, regexTreeTest, evaluatorTests]
+tests = testGroup "String Solver Tests" [parserTests, regexTreeTest, evaluatorTests]

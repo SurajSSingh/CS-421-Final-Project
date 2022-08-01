@@ -28,12 +28,10 @@ library
       PSST.Core
       PSST.Parser
       PSST.RTOperations
-      PSST.RTCalculus
       PSST.Evaluator
       PSST.Runtime
   other-modules:
       Lib
-      PSST.Transducer
       Paths_HaskellPSST
   hs-source-dirs:
       src
@@ -66,7 +64,6 @@ test-suite HaskellPSST-test
       EvalTests
       ParserTests
       RegexTests
-      TestHelpers
       Paths_HaskellPSST
   hs-source-dirs:
       test
