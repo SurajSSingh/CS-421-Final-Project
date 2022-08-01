@@ -1,6 +1,6 @@
 module PSST.RTOperations where
 
-import PSST.Core ( RegexNode (..), epsilonNode, emptySet, wrapNodeInCaptureGroup, everyThingNode, optionalNode, anyCharNode, epsilon, anyChar, maybeLTE, isEmpty, hasEpsilonTransition, RegexSequence )
+import PSST.Core ( RegexNode (..), epsilonNode, emptySet, wrapNodeInCaptureGroup, everyThingNode, optionalNode, anyCharNode, epsilon, anyChar, maybeLTE, isEmpty, RegexSequence )
 
 -- # Regex Node (originally Regex Tree) operations functions
 
@@ -20,6 +20,16 @@ maybeMax (Just x) Nothing = Nothing
 maybeMax (Just x) (Just y)
     | x >= y = Just x
     | otherwise = Just y
+
+hasEpsilonTransition :: RegexNode -> Bool
+hasEpsilonTransition (LiteralNode (Left False)) = True
+hasEpsilonTransition (ComplementNode c) = not $ hasEpsilonTransition c
+hasEpsilonTransition (ChoiceNode a b) = hasEpsilonTransition a || hasEpsilonTransition b
+hasEpsilonTransition (RepetitionNode _ 0 _ _) = True
+hasEpsilonTransition (RepetitionNode _ _ _ n) = hasEpsilonTransition n
+hasEpsilonTransition (CaptureGroupSequence _ []) = False
+hasEpsilonTransition (CaptureGroupSequence _ seq) = all hasEpsilonTransition seq
+hasEpsilonTransition n = False
 
 --- ## Regex Tree Singleton: Does a given regex tree contain only a single valid string 
 ---    These are:

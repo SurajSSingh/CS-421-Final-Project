@@ -5,13 +5,6 @@ import Control.Monad.Except
 import Data.List
 import Data.Maybe
 
----
-requireEscapeRegexSymbol :: [String]
-requireEscapeRegexSymbol = ["(", ")", "|", "?", "*", "+", "$", "."]
-
-escapedRegexSymbol :: [String]
-escapedRegexSymbol = ["\\(", "\\)", "\\|", "\\?", "\\*", "\\+", "\\$", "\\."]
-
 
 --- ### Environment
 type Env = H.HashMap String [Exp]
@@ -36,7 +29,7 @@ data RegexNode = LiteralNode (Either Bool String)
                deriving (
             --    Eq 
             --    , 
-               Show
+            --    Show
                )
 
 instance Eq RegexNode where
@@ -101,27 +94,27 @@ instance Eq RegexNode where
     a == b = False
 
 
--- instance Show RegexNode where
---     show (LiteralNode (Left False)) = "''"
---     show (LiteralNode (Left True)) = "."
---     show (LiteralNode (Right c)) = c
---     show (ComplementNode n) = "~" ++ show n
---     show (ChoiceNode a b) = show a ++ "|" ++ show b
---     show (RepetitionNode l s e n) = show n ++ rangeStr ++ isLazyStr
---         where
---             isLazyStr = if l then "?" else ""
---             rangeStr = case (s, e) of
---                 (start, Just end)
---                     | end == 1     -> "?"
---                     | start == end -> "{" ++ show start ++ "}"
---                     | otherwise    -> "{" ++ show start ++ "," ++ show end ++ "}"
---                 (0, Nothing)       -> "*"
---                 (1, Nothing)       -> "+"
---                 (start, Nothing)   -> "{" ++ show start ++ ",}"
---     show (CaptureGroupSequence num seq) = "<$" ++ groupNum ++ ">" ++ "(" ++ seqStr ++ ")"
---         where
---             groupNum = show $ abs num
---             seqStr = intercalate "" (Prelude.map show seq)
+instance Show RegexNode where
+    show (LiteralNode (Left False)) = "''"
+    show (LiteralNode (Left True)) = "."
+    show (LiteralNode (Right c)) = c
+    show (ComplementNode n) = "~" ++ show n
+    show (ChoiceNode a b) = show a ++ "|" ++ show b
+    show (RepetitionNode l s e n) = show n ++ rangeStr ++ isLazyStr
+        where
+            isLazyStr = if l then "?" else ""
+            rangeStr = case (s, e) of
+                (start, Just end)
+                    | end == 1     -> "?"
+                    | start == end -> "{" ++ show start ++ "}"
+                    | otherwise    -> "{" ++ show start ++ "," ++ show end ++ "}"
+                (0, Nothing)       -> "*"
+                (1, Nothing)       -> "+"
+                (start, Nothing)   -> "{" ++ show start ++ ",}"
+    show (CaptureGroupSequence num seq) = "<$" ++ groupNum ++ ">" ++ "(" ++ seqStr ++ ")"
+        where
+            groupNum = show $ abs num
+            seqStr = intercalate "" (Prelude.map show seq)
 
 --- Nothing in this specific case means Infinity
 maybeLTE :: Maybe Int -> Maybe Int -> Bool
@@ -190,16 +183,6 @@ renumberCaptureGroup num (ln@(LiteralNode _):ns) = (finNum, ln : newNs)
 wrapNodeInCaptureGroup :: RegexSequence -> RegexNode
 -- wrapNodeInCaptureGroup [CaptureGroupSequence num node] = CaptureGroupSequence 0 $ snd $ renumberCaptureGroup 1 node
 wrapNodeInCaptureGroup n = CaptureGroupSequence 0 $ snd $ renumberCaptureGroup 1 n
-
-hasEpsilonTransition :: RegexNode -> Bool
-hasEpsilonTransition (LiteralNode (Left False)) = True
-hasEpsilonTransition (ComplementNode c) = not $ hasEpsilonTransition c
-hasEpsilonTransition (ChoiceNode a b) = hasEpsilonTransition a || hasEpsilonTransition b
-hasEpsilonTransition (RepetitionNode _ 0 _ _) = True
-hasEpsilonTransition (RepetitionNode _ _ _ n) = hasEpsilonTransition n
-hasEpsilonTransition (CaptureGroupSequence _ []) = False
-hasEpsilonTransition (CaptureGroupSequence _ seq) = all hasEpsilonTransition seq
-hasEpsilonTransition n = False
 
 --- ### Expressions
 data Exp = IntExp Int

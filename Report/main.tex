@@ -2,7 +2,7 @@
 \usepackage[utf8]{inputenc}
 \usepackage{mathptmx}
 \usepackage{natbib}
-\usepackage[top=1in, bottom=1in, left=1in, right=1in]{geometry}
+\usepackage[top=1in, bottom=1in, left=0.9in, right=0.9in]{geometry}
 \usepackage{enumitem}
 \usepackage[usenames,dvipsnames]{xcolor}
 \usepackage{hyperref}
@@ -62,7 +62,7 @@ The program can also run a `check'/`solve' command on a single variable, which w
 
 \subsection{Components}\label{sec:components}
 There are 5 main modules created for this project, which are:
-\begin{enumerate}
+\begin{enumerate}[itemsep=-0.2em]
     \item Core: Holds the primary data structure, type aliases, and generally used helper functions for the program
     \item RTOperations: Holds specific operations on the Regex Tree Node, such as determining if a pattern is a singleton and returning the union of two patterns.
     \item Parser: Provides the mechanism for parsing string into Expression
@@ -111,27 +111,52 @@ This section will go over the high-level aspects of the 5 main modules described
 \subsection{Core module}\label{code:core}
 This module is primarily dedicated to the data structures and helper functions used throughout the rest of the program.
 
-\subsection{RTOperations module}\label{code:rtops}
+\begin{itemize}[itemsep=-0.5em]
+    \item $RegexNode$: This is the primary data structure for storing and operating on regular expressions. It is structured like a tree, where the root is the full string capture group and .
+    \begin{itemize}[itemsep=-0.3em]
+        \item $Literal$: Represents any literal character. Dot (`$.$') Meta-character can represent any literal and empty-string represents epsilon.
+        \item $Choice$: Represents a choice between two nodes. Due to limitations of parsing, the choice symbol binds to only the previous and next node (instead of the usual greedy implementation).
+        \item $Repetition$: Represents repeating a node. Binds the previous group. Can either be a range like `$\{start, end\}$' or special symbol like $*$ and $+$.
+        \item $Capture Group Sequence$: Allows grouping a sequence using parenthesis $()$. Each group is uniquely numbered.
+        \item $Complement$: A special addition to the regex system, this allows creating set complements of a given node. Ideally, this would be used with the calculus rules for easily handling the language complement of a regex.
+    \end{itemize}
+    \item $Expression$: These are all the types that can be evaluated in the program. There are 3 simple expressions: $IntExp$ for integer, $RegexExp$ for regex strings, and $VarExp$ for variables. For expression that operator on these expressions, there are: $AssignmentExp$ for assigning expressions to variables, $OperatorExp$ for running operations between expressions, and $StateOpExp$ for running operations on the state of the program itself. There is also $ResultValExp$ which is used only when returning non-expression values (mostly Boolean values).
+    \item $Diagnostic$: This is used to construct any errors when evaluating the program.
+    \item $Env$: Represents the program environment, implemented as a Hashmap of strings (variables) to a list of expression.
+    \item $EvalState$: Wraps the environment and diagnostic using a Sttate Monad. 
+\end{itemize}
 
+
+\subsection{RTOperations module}\label{code:rtops}
+This module houses all the main regex tree operations as well as some helper functions.
+\begin{itemize}[itemsep=-0.3em]
+    \item $maybeMin$ and $maybeMax$: Allows finding the min and max values from $Maybe$ $Int$ where $Nothing$ represents infinity.
+    \item $hasEpsilonTransition$: Checks if a Regex Node has an epsilon transition.
+    \item $isNodeSingleton$: This checks if a Regex Node is a set with a single value. For example `$abc$' is a singleton set since it equals \{`$abc$'\}, but `$a?$' is not since that equals \{`$a$', `$ $'\}.
+    \item $isSubNode$ and $subNodeSequence$: These two functions deal with checking if a given regex node is a subset (sub-node) of another regex node.
+    \item $regexUnion$ and $regexUnify$: These two functions perform the set union and set intersection operations on two regex strings. $regexUnify$ is special in that it is a function which can return the empty set.
+\end{itemize}
 
 \subsection{Parser module}\label{code:parse}
-
+The parser uses Parsec combinator parsing library to .
 
 \subsection{Evaluator module}\label{code:eval}
-
+The evaluator module defines the location for evaluating expression received after parsing. There are 3 encompassing data types and function:
+\begin{itemize}[itemsep=-0.3em]
+    \item $stateOperations$: A hashmap that associates a command with a state operation function. State operation function take the current environment and an optional variable to constrain the operation on. The current program has 3 command: $state$ (returns the current state of the variable/environment), $check$/$solve$ (check if there exists a possible string assignment for a variable, given its constraints), and $clear$ (clears all the expression from a variable or the environment). 
+    \item $expOperations$: A hashmap that associates an expression operation with a function. Each expression operation takes up to 3 expression (usually string regex) and returns another expression. Most of the operations lift the functions from the RTOperations module. The primary exception to this is the $concatOp$, which is implemented directly in this module.
+    \item $eval$: The main evaluation function. Takes in an expression, tries to evaluate it and returns an EvalState with expression. 
+\end{itemize}
+The remaining function are helper functions or implementations for operation expressions. 
 
 \subsection{Runtime module}\label{code:runtime}
-The runtime module is primarily used to glue together all the previous parts into a single .
+The runtime module glues together all the previous parts into a single working REPL program.
+The most important function in this module is the `repl' function, which runs the program.
+The other helper function are used to pull out specific components from the REPL to make them easier to change.
 
 \section{Tests}\label{sec:tests}
 %%% Coming up with appropriate tests is one of the most important part of  good software development. Your tests should include unit tests, feature  tests, and larger test codes. Give a short description of the tests  used, performance results if appropriate (e.g., memory consumption for  garbage collection) etc. Be sure to explain how these tests exercise the  concept(s) you've implemented.
-\subsection{Parser Tests}\label{test:parser}
-These tests focus on parsing strings and converting them into Regex Nodes and Expressions. 
-
-\subsection{Regex Operations Tests}\label{test:regex}
-These tests focus on specific operations on regular expression.
-
-\subsection{Evaluator Tests}\label{test:eval}
+There are three helper files for the tests.
 
 \bibliography{main}
 
