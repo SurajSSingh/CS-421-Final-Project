@@ -24,6 +24,7 @@ helpText :: [String]
 helpText = ["Welcome to String Solver"
             , "Commands:"
             , "  * help:              Display this help text"
+            , "  * quit/exit:         End the program"
             , "  * check <variable?>: Check the current state of the solver to determine if it is satisfiable."
             , "                       If provided with an optional variable, it will do an internal check of that variable "
             , "                       (i.e. is the variable by itself satisfiable, assuming all other variables are?)"
