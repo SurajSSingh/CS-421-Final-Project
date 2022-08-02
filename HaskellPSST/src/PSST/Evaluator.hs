@@ -37,7 +37,7 @@ concatOp e1 Nothing Nothing = throwError $ NumOfArgumentsError "Concat" 2 1 [sho
 -- Multiple Concat, evaluate inner then outer
 concatOp e1 (Just (OperatorExp "concat" e2 me3 Nothing)) Nothing = do
   c1 <- concatOp e2 me3 Nothing
-  return $ OperatorExp "concat" e1 (Just c1) Nothing
+  concatOp e1 (Just c1) Nothing
 -- Concat anything with variable(s), leave alone
 concatOp exp1@(VarExp var1) (Just exp2@(VarExp var2)) Nothing = do
   return $ OperatorExp "concat" exp1 (Just exp2) Nothing
